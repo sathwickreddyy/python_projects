@@ -1,0 +1,8 @@
+virtualenv
+imutils
+numpy
+cmake
+CMake
+dlib
+opencv-python
+opencv-contrib-python
