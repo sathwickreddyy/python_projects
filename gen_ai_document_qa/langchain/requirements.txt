@@ -1,0 +1,5 @@
+ipykernel
+jupyter
+langchain
+langchain_aws
+langchain-community
