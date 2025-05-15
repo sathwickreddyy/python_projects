@@ -1,5 +1,7 @@
 ## Redis Locking Example
 
+![Architecture](https://github.com/sathwickreddyy/python_projects/blob/main/redis_distributed_locking/aws_impl/cdk/aws_leader_election_architecture.png)
+
 # Leader Election and Execution Flow
 
 This approach ensures that only one instance executes the program at a time
