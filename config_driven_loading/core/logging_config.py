@@ -6,7 +6,7 @@ Comprehensive logging configuration for the library
 
 import logging
 import structlog
-from typing import Dict, Any
+from typing import Dict, Any, List
 import sys
 from datetime import datetime
 
