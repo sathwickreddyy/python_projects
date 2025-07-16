@@ -26,7 +26,7 @@ from jsonpath_ng import parse as jsonpath_parse
 
 from data_loaders.base_loader import BaseDataLoader
 from models.data_record import DataRecord
-from config.data_loader_config import DataSourceDefinition
+from config.data_loader_config import DataSourceDefinition, ColumnMapping
 from core.exceptions import DataLoadingException
 from core.base_types import DataSourceType
 
@@ -163,7 +163,7 @@ class JSONDataLoader(BaseDataLoader):
         else:
             return [json_data]
 
-    def _process_column_mappings(self, node: Any, mappings: List) -> Dict[str, Any]:
+    def _process_column_mappings(self, node: Any, mappings: List[ColumnMapping]) -> Dict[str, Any]:
         """
         Apply column mappings to extract fields from JSON node.
 
