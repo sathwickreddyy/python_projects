@@ -41,8 +41,9 @@ class TargetConfig(BaseModel):
     type: TargetType = Field(None, description="Target Type")
     batch_size: Optional[int] = Field(1000, description="Batch size for database operations")
 
+    @classmethod
     @field_validator("batch_size")
-    def validate_batch_size(self, v):
+    def validate_batch_size(cls, v):
         if v is not None and (v < 1 or v > 10000):
             raise ValueError('Batch size must be between 1 and 10000')
         return v
@@ -88,8 +89,9 @@ class DataSourceDefinition(BaseModel):
     model: Optional[ModelConfig] = Field(None, description="Model configuration")
     validation: Optional[ValidationConfig] = Field(None, description="Validation configuration")
 
+    @classmethod
     @field_validator('model')
-    def validate_model_config(self, v, values):
+    def validate_model_config(cls, v, values):
         if 'target' in values and values['target'].type == TargetType.MODEL and v is None:
             raise ValueError('Model configuration is required when target type is MODEL')
         return v
@@ -103,8 +105,9 @@ class DataLoaderConfiguration(BaseModel):
         ..., description="Dictionary/Map of data source definitions."
     )
 
+    @classmethod
     @field_validator('data_sources')
-    def validate_data_sources(self, v, values):
+    def validate_data_sources(cls, v, values):
         if not v:
             raise ValueError('At least one data source must be configured')
         return v
