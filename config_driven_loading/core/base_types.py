@@ -10,7 +10,7 @@ from datetime import datetime
 
 class DataSourceType(str, Enum):
     """
-        Enumeration of supported data source types.
+    Enumeration of supported data source types.
     """
     CSV = "csv"
     JSON = "json"

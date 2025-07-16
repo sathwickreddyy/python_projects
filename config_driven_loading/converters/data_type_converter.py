@@ -15,9 +15,9 @@ import re
 
 class DataTypeConverter:
     """
-    Comprehensive data type converter with support for various data types and formats.
+    Comprehensive data type converters with support for various data types and formats.
 
-    This converter handles conversion of string values to typed Python objects
+    This converters handles conversion of string values to typed Python objects
     with proper error handling and validation.
     """
 
