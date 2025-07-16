@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "config-driven-data-ingestion"
+version = "1.0.1"
+description = "A comprehensive, config-driven data ingestion library for Python"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name="Sathwick", email="sathwick@outlook.in" }
+]
+keywords = ["data-ingestion", "ETL", "csv", "json", "yaml", "sqlalchemy", "database", "batch-processing"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+dependencies = [
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.0.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.22.0",
+    "python-dateutil>=2.8.2",
+    "structlog>=24.1.0",
+    "jsonpath-ng>=1.6.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0"
+]
+postgresql = ["psycopg2-binary>=2.9.9"]
+mysql = ["pymysql>=1.0.0"]
+sqlite = ["aiosqlite>=0.19.0"]
+oracle = ["cx-Oracle>=8.3.0"]
+all = [
+    "psycopg2-binary>=2.9.9",
+    "pymysql>=1.0.0",
+    "aiosqlite>=0.19.0",
+    "cx-Oracle>=8.3.0"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/sathwickreddyy/python_projects/tree/main/config_driven_loading"
+"Bug Tracker" = "https://github.com/sathwickreddyy/python_projects/issues"
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "examples*"]
+
+[tool.setuptools.package-data]
+"config_driven_data_ingestion" = ["py.typed"]
+
+[project.scripts]
+data-ingestion = "config_driven_data_ingestion.cli.commands:cli"
