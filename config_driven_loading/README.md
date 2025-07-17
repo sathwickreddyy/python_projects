@@ -6,10 +6,10 @@ Framework that eliminates repetitive data loading code by using configuration fi
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   DATA SOURCES  │    │   ORCHESTRATOR   │    │  LiqForecast    │
+│   DATA SOURCES  │    │   ORCHESTRATOR   │    │  Database       │
 │                 │    │                  │    │    Schema       │
 │ • CSV Files     │────│ Config Reader    │────│                 │
-│ • Excel Files   │    │ Data Processor   │    │ • forecast_data │
+│ • Excel Files   │    │ Data Processor   │    │ • api_data      │
 │ • REST APIs     │    │ Column Mapper    │    │ • market_trends │
 │ • JSON Files    │    │ Database Writer  │    │ • risk_metrics  │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
@@ -28,7 +28,7 @@ Framework that eliminates repetitive data loading code by using configuration fi
 
 ### **Data Sources Configuration (data-sources.yml)**
 ```yaml
-# Data Sources Configuration for LiqForecast Schema
+# Data Sources Configuration for Database Schema
 data_sources:
   market_data_csv:
     type: "csv"
