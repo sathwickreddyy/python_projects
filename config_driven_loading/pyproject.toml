@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "config-driven-data-ingestion"
-version = "1.0.1"
+version = "1.0.2"
 description = "A comprehensive, config-driven data ingestion library for Python"
 readme = "README.md"
 requires-python = ">=3.10"

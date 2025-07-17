@@ -3,8 +3,7 @@ Simplified client interface for data ingestion operations.
 
 @author sathwick
 """
-from typing import Dict, Any, List, Optional, Union
-from pathlib import Path
+from typing import Dict, Any, List, Optional
 
 from client.orchestrator_factory import DataIngestionFactory
 from core.base_types import LoadingStats
