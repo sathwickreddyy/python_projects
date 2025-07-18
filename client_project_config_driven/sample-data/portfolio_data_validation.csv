@@ -1,0 +1,6 @@
+portfolio_id,portfolio_name,risk_profile,liquidity_threshold,manager_name,inception_date,total_value,number_of_holdings,is_active,currency
+PORT001,Conservative Growth,LOW,0.75,John Smith,2020-01-15,1000000.00,50,true,USD
+INVALID,Aggressive Fund,HIGH,0.45,Jane Doe,2019-03-20,2500000.00,120,true,USD
+PORT003,Balanced Portfolio,MEDIUM,0.60,Bob Johnson,2021-06-10,1500000.00,75,true,EUR
+PORT004,Ultra High Risk,ULTRA_HIGH,0.30,Alice Brown,2022-01-01,5000000.00,200,true,USD
+PORT005,Valid Ultra High,ULTRA_HIGH,0.85,Charlie Wilson,2020-12-01,3000000.00,150,true,USD

@@ -1,0 +1,328 @@
+{
+  "orders": [
+    {
+      "orderId": "ORD-2024-001",
+      "customer": {
+        "customerId": "CUST-001",
+        "profile": {
+          "name": "John Doe",
+          "tier": "premium"
+        },
+        "contact": {
+          "email": "john.doe@example.com",
+          "phone": "+1-555-0123"
+        }
+      },
+      "orderDetails": {
+        "items": [
+          {
+            "itemId": "ITEM-001",
+            "product": {
+              "productId": "PROD-001",
+              "name": "Wireless Headphones",
+              "category": "Electronics"
+            },
+            "quantity": 2,
+            "unitPrice": 99.99
+          },
+          {
+            "itemId": "ITEM-002",
+            "product": {
+              "productId": "PROD-002",
+              "name": "Phone Case",
+              "category": "Accessories"
+            },
+            "quantity": 1,
+            "unitPrice": 19.99
+          }
+        ],
+        "pricing": {
+          "subtotal": 219.97,
+          "tax": 17.60,
+          "shipping": 9.99,
+          "total": 247.56
+        },
+        "shipping": {
+          "method": "standard",
+          "address": {
+            "street": "123 Main St",
+            "city": "New York",
+            "state": "NY",
+            "zipCode": "10001",
+            "country": "USA"
+          }
+        }
+      },
+      "timestamps": {
+        "created": "2024-01-15T10:30:00Z",
+        "updated": "2024-01-15T10:30:00Z"
+      },
+      "status": "confirmed"
+    },
+    {
+      "orderId": "ORD-2024-002",
+      "customer": {
+        "customerId": "CUST-002",
+        "profile": {
+          "name": "Jane Smith",
+          "tier": "standard"
+        },
+        "contact": {
+          "email": "jane.smith@example.com",
+          "phone": "+1-555-0456"
+        }
+      },
+      "orderDetails": {
+        "items": [
+          {
+            "itemId": "ITEM-003",
+            "product": {
+              "productId": "PROD-003",
+              "name": "Smart Watch",
+              "category": "Electronics"
+            },
+            "quantity": 1,
+            "unitPrice": 199.99
+          }
+        ],
+        "pricing": {
+          "subtotal": 199.99,
+          "tax": 15.20,
+          "shipping": 5.00,
+          "total": 220.19
+        },
+        "shipping": {
+          "method": "express",
+          "address": {
+            "street": "456 Elm St",
+            "city": "San Francisco",
+            "state": "CA",
+            "zipCode": "94102",
+            "country": "USA"
+          }
+        }
+      },
+      "timestamps": {
+        "created": "2024-02-10T14:45:00Z",
+        "updated": "2024-02-10T15:00:00Z"
+      },
+      "status": "shipped"
+    },
+    {
+      "orderId": "ORD-2024-003",
+      "customer": {
+        "customerId": "CUST-003",
+        "profile": {
+          "name": "Alex Johnson",
+          "tier": "premium"
+        },
+        "contact": {
+          "email": "alex.johnson@example.com",
+          "phone": "+1-555-0789"
+        }
+      },
+      "orderDetails": {
+        "items": [
+          {
+            "itemId": "ITEM-004",
+            "product": {
+              "productId": "PROD-004",
+              "name": "Bluetooth Speaker",
+              "category": "Electronics"
+            },
+            "quantity": 3,
+            "unitPrice": 49.99
+          }
+        ],
+        "pricing": {
+          "subtotal": 149.97,
+          "tax": 11.25,
+          "shipping": 7.50,
+          "total": 168.72
+        },
+        "shipping": {
+          "method": "standard",
+          "address": {
+            "street": "789 Oak Ave",
+            "city": "Austin",
+            "state": "TX",
+            "zipCode": "73301",
+            "country": "USA"
+          }
+        }
+      },
+      "timestamps": {
+        "created": "2024-03-12T09:20:00Z",
+        "updated": "2024-03-12T09:25:00Z"
+      },
+      "status": "delivered"
+    },
+    {
+      "orderId": "ORD-2024-004",
+      "customer": {
+        "customerId": "CUST-004",
+        "profile": {
+          "name": "Emily Davis",
+          "tier": "standard"
+        },
+        "contact": {
+          "email": "emily.davis@example.com",
+          "phone": "+1-555-0912"
+        }
+      },
+      "orderDetails": {
+        "items": [
+          {
+            "itemId": "ITEM-005",
+            "product": {
+              "productId": "PROD-005",
+              "name": "USB-C Hub",
+              "category": "Accessories"
+            },
+            "quantity": 1,
+            "unitPrice": 29.99
+          },
+          {
+            "itemId": "ITEM-006",
+            "product": {
+              "productId": "PROD-006",
+              "name": "Wireless Mouse",
+              "category": "Electronics"
+            },
+            "quantity": 2,
+            "unitPrice": 25.50
+          }
+        ],
+        "pricing": {
+          "subtotal": 80.99,
+          "tax": 6.48,
+          "shipping": 4.99,
+          "total": 92.46
+        },
+        "shipping": {
+          "method": "standard",
+          "address": {
+            "street": "321 Maple Dr",
+            "city": "Chicago",
+            "state": "IL",
+            "zipCode": "60601",
+            "country": "USA"
+          }
+        }
+      },
+      "timestamps": {
+        "created": "2024-04-05T16:10:00Z",
+        "updated": "2024-04-05T16:10:00Z"
+      },
+      "status": "processing"
+    },
+    {
+      "orderId": "ORD-2024-005",
+      "customer": {
+        "customerId": "CUST-005",
+        "profile": {
+          "name": "Michael Brown",
+          "tier": "premium"
+        },
+        "contact": {
+          "email": "michael.brown@example.com",
+          "phone": "+1-555-1234"
+        }
+      },
+      "orderDetails": {
+        "items": [
+          {
+            "itemId": "ITEM-007",
+            "product": {
+              "productId": "PROD-007",
+              "name": "Laptop Stand",
+              "category": "Accessories"
+            },
+            "quantity": 1,
+            "unitPrice": 39.99
+          }
+        ],
+        "pricing": {
+          "subtotal": 39.99,
+          "tax": 3.20,
+          "shipping": 6.99,
+          "total": 50.18
+        },
+        "shipping": {
+          "method": "express",
+          "address": {
+            "street": "567 Pine St",
+            "city": "Seattle",
+            "state": "WA",
+            "zipCode": "98101",
+            "country": "USA"
+          }
+        }
+      },
+      "timestamps": {
+        "created": "2024-05-20T12:00:00Z",
+        "updated": "2024-05-20T12:30:00Z"
+      },
+      "status": "confirmed"
+    },
+    {
+      "orderId": "ORD-2024-006",
+      "customer": {
+        "customerId": "CUST-006",
+        "profile": {
+          "name": "Sophia Green",
+          "tier": "standard"
+        },
+        "contact": {
+          "email": "sophia.green@example.com",
+          "phone": "+1-555-5678"
+        }
+      },
+      "orderDetails": {
+        "items": [
+          {
+            "itemId": "ITEM-008",
+            "product": {
+              "productId": "PROD-008",
+              "name": "Gaming Mouse Pad",
+              "category": "Accessories"
+            },
+            "quantity": 2,
+            "unitPrice": 14.99
+          },
+          {
+            "itemId": "ITEM-009",
+            "product": {
+              "productId": "PROD-009",
+              "name": "Portable SSD",
+              "category": "Electronics"
+            },
+            "quantity": 1,
+            "unitPrice": 129.99
+          }
+        ],
+        "pricing": {
+          "subtotal": 159.97,
+          "tax": 12.80,
+          "shipping": 5.50,
+          "total": 178.27
+        },
+        "shipping": {
+          "method": "standard",
+          "address": {
+            "street": "678 Cedar Ln",
+            "city": "Denver",
+            "state": "CO",
+            "zipCode": "80202",
+            "country": "USA"
+          }
+        }
+      },
+      "timestamps": {
+        "created": "2024-06-25T08:30:00Z",
+        "updated": "2024-06-25T08:30:00Z"
+      },
+      "status": "confirmed"
+    }
+  ]
+}

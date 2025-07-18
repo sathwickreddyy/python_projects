@@ -1,0 +1,55 @@
+data-sources:
+  market_data_csv:
+    type: "CSV"
+    source:
+      filePath: "src/main/resources/sample-data/market_data.csv"
+      delimiter: ","
+      header: true
+      encoding: "UTF-8"
+    target:
+      table: "public.market_trends"
+    columnMapping:
+      - source: "date"
+        target: "trade_date"
+        data-type: "LOCALDATE"
+      - source: "currency_pair"
+        target: "currency"
+      - source: "rate"
+        target: "exchange_rate"
+        data-type: "DOUBLE"
+      - source: "volume"
+        target: "trading_volume"
+        data-type: "BIGDECIMAL"
+  market_data_csv_bitemporal:
+    type: "CSV"
+    source:
+      filePath: "src/main/resources/sample-data/market_data.csv"
+      delimiter: ","
+      header: true
+      encoding: "UTF-8"
+#      target:
+#        table: "public.market_trends_bi_temporal"
+#        isBiTemporal: true
+    columnMapping:
+      - source: "date"
+        target: "trade_date"
+        data-type: "LOCALDATE"
+        target-date-format: "dd-MM-yyyy"
+      - source: "currency_pair"
+        target: "currency"
+      - source: "rate"
+        target: "exchange_rate"
+        data-type: "DOUBLE"
+      - source: "volume"
+        target: "trading_volume"
+        data-type: "BIGDECIMAL"
+
+# All data type conversions are supported - check DataTypeConverter class that is being used by orchestrator
+# test mode - we can remove target option
+# test mode - we can exclude the dataTypeValidationRequired option
+# test mode - Any column commenting is easy and won't be any problem - loads with null for that column in the table easy in terms of testing
+# test mode -All types of delimiters are supported
+# test mode - we can specify target date formats as well - cmd+click on columnMapping to check all options
+# Supports both standard loading and bitemporal loading
+# Any source column changes are easy to make and will not break the code and dont need worry on fixing bugs
+# New file loading is easy
