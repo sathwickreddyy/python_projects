@@ -6,9 +6,9 @@ Simplified client interface for data ingestion operations.
 from typing import Dict, Any, List, Optional
 
 from client.orchestrator_factory import DataIngestionFactory
-from core.base_types import LoadingStats
-from core.exceptions import DataIngestionException
-from core.logging_config import setup_logging, DataIngestionLogger
+from models.core.base_types import LoadingStats
+from models.core.exceptions import DataIngestionException
+from models.core.logging_config import setup_logging, DataIngestionLogger
 
 
 class DataIngestionClient:

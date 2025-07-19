@@ -3,11 +3,11 @@ FastAPI application for config-driven data ingestion.
 
 @author sathwick
 """
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from core.logging_config import setup_logging, DataIngestionLogger
+from models.core.logging_config import setup_logging, DataIngestionLogger
 
 
 @asynccontextmanager

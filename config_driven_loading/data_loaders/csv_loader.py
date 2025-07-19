@@ -32,13 +32,13 @@ Author:
 @sathwick
 """
 import csv
-from typing import Iterator, Dict, Any
+from typing import Iterator
 from pathlib import Path
-from core.base_types import DataSourceType
+from models.core.base_types import DataSourceType
 from data_loaders.base_loader import BaseDataLoader
 from models.data_record import DataRecord
 from config.data_loader_config import DataSourceDefinition
-from core.exceptions import DataLoadingException
+from models.core.exceptions import DataLoadingException
 
 
 class CSVDataLoader(BaseDataLoader):

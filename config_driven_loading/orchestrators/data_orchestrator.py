@@ -7,9 +7,9 @@ from typing import Dict, Iterator
 from sqlalchemy.engine import Engine
 from config.data_loader_config import DataLoaderConfiguration, DataSourceDefinition
 from converters.data_type_converter import DataTypeConverter
-from core.base_types import LoadingStats, DataSourceType
-from core.exceptions import DataIngestionException
-from core.logging_config import DataIngestionLogger
+from models.core.base_types import LoadingStats, DataSourceType
+from models.core.exceptions import DataIngestionException
+from models.core.logging_config import DataIngestionLogger
 from data_loaders.csv_loader import CSVDataLoader
 from data_loaders.json_loader import JSONDataLoader
 from models.data_record import DataRecord

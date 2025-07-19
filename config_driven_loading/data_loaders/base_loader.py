@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Iterator, Dict, Any
 from models.data_record import DataRecord
 from config.data_loader_config import DataSourceDefinition
-from core.logging_config import DataIngestionLogger
+from models.core.logging_config import DataIngestionLogger
 
 class BaseDataLoader(ABC):
     """

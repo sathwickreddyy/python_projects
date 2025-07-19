@@ -23,17 +23,17 @@ Summary of the flow:
 @author sathwick
 """
 
-from typing import Iterator, List, Dict, Any
+from typing import Iterator, List
 from datetime import datetime
-from sqlalchemy import create_engine, text, MetaData
+from sqlalchemy import text, MetaData
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import NoSuchTableError
 from models.data_record import DataRecord
 from config.data_loader_config import DataSourceDefinition
-from core.base_types import LoadingStats
-from core.exceptions import DatabaseWriteException
-from core.logging_config import DataIngestionLogger
+from models.core.base_types import LoadingStats
+from models.core.exceptions import DatabaseWriteException
+from models.core.logging_config import DataIngestionLogger
 
 
 class DatabaseWriter:

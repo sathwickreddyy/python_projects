@@ -20,15 +20,15 @@ Typical Usage Example:
 @author Sathwick
 """
 import json
-from typing import Iterator, Dict, Any, List, Union
+from typing import Iterator, Dict, Any, List
 from pathlib import Path
 from jsonpath_ng import parse as jsonpath_parse
 
 from data_loaders.base_loader import BaseDataLoader
 from models.data_record import DataRecord
 from config.data_loader_config import DataSourceDefinition, ColumnMapping
-from core.exceptions import DataLoadingException
-from core.base_types import DataSourceType
+from models.core.exceptions import DataLoadingException
+from models.core.base_types import DataSourceType
 
 
 class JSONDataLoader(BaseDataLoader):

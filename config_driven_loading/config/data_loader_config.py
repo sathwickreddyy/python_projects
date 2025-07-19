@@ -5,9 +5,9 @@ Skeleton for configuration files i.e, YAML Config.
 @author sathwick
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
-from core.base_types import DataSourceType, TargetType, DataType, MappingStrategy
+from models.core.base_types import DataSourceType, TargetType, DataType, MappingStrategy
 
 class SourceConfig(BaseModel):
     """

@@ -10,7 +10,7 @@ import yaml
 from sqlalchemy import Engine, create_engine
 
 from config.data_loader_config import DataLoaderConfiguration
-from core.logging_config import DataIngestionLogger
+from models.core.logging_config import DataIngestionLogger
 from orchestrators.data_orchestrator import DataOrchestrator
 
 
