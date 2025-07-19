@@ -1,0 +1,6 @@
+trade_date,currency_pair,exchange_rate,trading_volume
+,,,
+2024-01-02,"",0.8520,
+2024-01-03,GBP/USD,,800000
+2024-01-04,USD/JPY,110.5000,
+2024-01-05,EUR/GBP,0.8650,900000

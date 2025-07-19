@@ -1,0 +1,68 @@
+{
+  "users": [
+    {
+      "id": "user001",
+      "profile": {
+        "personal": {
+          "firstName": "John",
+          "lastName": "Doe",
+          "dateOfBirth": "1990-05-15"
+        },
+        "contact": {
+          "email": "john.doe@example.com",
+          "phone": "+1-555-0123",
+          "addresses": [
+            {
+              "type": "home",
+              "street": "123 Main St",
+              "city": "New York",
+              "state": "NY",
+              "zipCode": "10001",
+              "country": "USA"
+            },
+            {
+              "type": "work",
+              "street": "456 Business Ave",
+              "city": "New York",
+              "state": "NY",
+              "zipCode": "10002",
+              "country": "USA"
+            }
+          ]
+        }
+      },
+      "preferences": {
+        "notifications": true,
+        "newsletter": false
+      }
+    },
+    {
+      "id": "user002",
+      "profile": {
+        "personal": {
+          "firstName": "Jane",
+          "lastName": "Smith",
+          "dateOfBirth": "1985-08-22"
+        },
+        "contact": {
+          "email": "jane.smith@example.com",
+          "phone": "+1-555-0456",
+          "addresses": [
+            {
+              "type": "home",
+              "street": "789 Oak Street",
+              "city": "Los Angeles",
+              "state": "CA",
+              "zipCode": "90210",
+              "country": "USA"
+            }
+          ]
+        }
+      },
+      "preferences": {
+        "notifications": false,
+        "newsletter": true
+      }
+    }
+  ]
+}

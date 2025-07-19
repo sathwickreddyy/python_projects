@@ -1,0 +1,6 @@
+portfolio_id,var_95,expected_shortfall,liquidity_score,report_date,beta,sharpe_ratio,max_drawdown,risk_category,is_stress_test_passed
+PORT001,-0.05,-0.08,85.5,2024-01-01,0.8,1.2,-0.15,LOW,true
+PORT002,0.02,-0.12,75.0,2024-01-01,1.2,0.8,-0.25,MEDIUM,false
+PORT003,-0.08,-0.06,90.0,2024-01-01,1.5,1.5,-0.20,HIGH,true
+PORT004,-0.12,-0.18,65.0,2024-01-01,2.0,0.5,-0.35,EXTREME,false
+PORT005,-0.10,-0.15,80.0,2024-01-01,1.8,1.0,-0.30,HIGH,true

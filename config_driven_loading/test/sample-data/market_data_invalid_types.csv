@@ -1,0 +1,6 @@
+trade_date,currency_pair,exchange_rate,trading_volume
+invalid_date,USD/EUR,0.8500,1000000
+2024-01-02,USD/EUR,invalid_rate,1200000
+2024-01-03,GBP/USD,1.2750,invalid_volume
+2024-01-04,USD/JPY,110.5000,1500000
+2024-01-05,EUR/GBP,0.8650,900000
