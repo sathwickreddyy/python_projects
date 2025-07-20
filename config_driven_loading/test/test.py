@@ -4,7 +4,7 @@ Comprehensive test script for config-driven data ingestion library using externa
 
 @author sathwick
 """
-from sqlalchemy import create_engine, URL, Engine
+from sqlalchemy import create_engine, URL, Engine, text
 from sqlalchemy.pool import QueuePool
 from client.data_ingestion_client import DataIngestionClient
 import os
@@ -28,32 +28,22 @@ def create_database_engine() -> Engine:
         database="config_driven_approach"
     )
 
-    # Create engine with custom configuration
     engine = create_engine(
         database_url,
-        # Connection Pool Configuration
-        pool_size=15,  # Number of connections to maintain in pool
-        max_overflow=25,  # Additional connections beyond pool_size
-        pool_pre_ping=True,  # Validate connections before use
-        pool_recycle=3600,  # Recycle connections every hour
-        poolclass=QueuePool,  # Use QueuePool for connection pooling
-
-        # Connection Configuration
+        pool_size=15,
+        max_overflow=25,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        poolclass=QueuePool,
         connect_args={
-            "application_name": "ConfigDrivenDataIngestion",  # Identify app in DB logs
-            "connect_timeout": 10,  # Connection timeout
-            "server_settings": {
-                "timezone": "UTC"  # Set timezone
-            }
+            "application_name": "ConfigDrivenDataIngestion",
+            "connect_timeout": 10,
+            "options": "-c timezone=UTC"
         },
-
-        # Logging and Debugging
-        echo=False,  # Set to True to see all SQL statements
-        echo_pool=False,  # Set to True to see pool events
-
-        # Execution Options
-        future=True,  # Use SQLAlchemy 2.0 style
-        isolation_level="READ_COMMITTED"  # Set transaction isolation level
+        echo=False,
+        echo_pool=False,
+        future=True,
+        isolation_level="READ_COMMITTED"
     )
 
     print(f"✅ Created custom SQLAlchemy engine")
@@ -63,26 +53,15 @@ def create_database_engine() -> Engine:
 
     return engine
 
-
 def test_engine_connection(engine: Engine) -> bool:
-    """
-    Test the database engine connection.
-
-    Args:
-        engine: SQLAlchemy engine to test
-
-    Returns:
-        True if connection successful, False otherwise
-    """
     try:
         with engine.connect() as conn:
-            result = conn.execute("SELECT version() as db_version")
+            result = conn.execute(text("SELECT version() as db_version"))
             db_version = result.fetchone()
             print(f"✅ Database connection successful")
             print(f"   PostgreSQL version: {db_version[0][:50]}...")
 
-            # Test a simple query
-            result = conn.execute("SELECT current_database(), current_user, now()")
+            result = conn.execute(text("SELECT current_database(), current_user, now()"))
             db_info = result.fetchone()
             print(f"   Database: {db_info[0]}, User: {db_info[1]}, Time: {db_info[2]}")
 
@@ -93,8 +72,6 @@ def test_engine_connection(engine: Engine) -> bool:
 
 
 def test_data_ingestion():
-    """Test data ingestion with different scenarios using custom engine."""
-
     print("🚀 Starting Config-Driven Data Ingestion Tests")
     print("=" * 60)
 

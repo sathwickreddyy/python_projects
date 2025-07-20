@@ -53,25 +53,23 @@ class DataOrchestrator:
 
     def execute_data_loading(self, config: DataLoaderConfiguration, data_source_name: str) -> LoadingStats:
         """
-        Execute data loading for a specific data source.
-
-        Args:
-            config: Complete data loading configuration
-            data_source_name: Name of the data source to process
-
-        Returns:
-            LoadingStats with execution metrics
-
-        Raises:
-            DataIngestionException: If data loading fails
+        Execute data loading with enhanced statistics and error tracking.
         """
         if data_source_name not in config.data_sources:
             raise DataIngestionException(f"Data source '{data_source_name}' not found in configuration")
 
         data_source_config = config.data_sources[data_source_name]
 
+        # Initialize comprehensive stats
+        start_time = datetime.now()
+        stats = LoadingStats(
+            execution_time=start_time,
+            source_name=data_source_name,
+            target_table=data_source_config.target_config.table
+        )
+
         self.logger.info(
-            "Starting data loading execution",
+            "Starting data loading execution with enhanced tracking",
             data_source=data_source_name,
             source_type=data_source_config.type,
             target_table=data_source_config.target_config.table,
@@ -79,23 +77,66 @@ class DataOrchestrator:
         )
 
         try:
-            # Step 1: Load data from source
+            # Step 1: Load data from source (time this step)
+            read_start = datetime.now()
             data_stream = self._load_data_from_source(data_source_config)
+            read_end = datetime.now()
+            stats.read_time_ms = int((read_end - read_start).total_seconds() * 1000)
 
-            # Step 2: Process data (transformation, validation)
+            # Step 2: Process data (the processor will update its own stats)
+            process_start = datetime.now()
             processed_stream = self._process_data_stream(data_stream, data_source_config)
 
-            # Step 3: Write to database or print records based on enabled flag
+            # Collect processed records to get processing stats
+            processed_records = list(processed_stream)
+            process_end = datetime.now()
+            stats.process_time_ms = int((process_end - process_start).total_seconds() * 1000)
+
+            # Get processing stats from processor
+            if hasattr(self.data_processor, 'get_processing_stats'):
+                processing_stats = self.data_processor.get_processing_stats()
+                if processing_stats:
+                    # Merge processing errors into main stats
+                    stats.validation_errors.extend(processing_stats.validation_errors)
+                    stats.conversion_errors.extend(processing_stats.conversion_errors)
+                    stats.processing_errors.extend(processing_stats.processing_errors)
+                    stats.error_details.extend(processing_stats.error_details)
+
+            # Step 3: Write to database or print records
+            write_start = datetime.now()
             if data_source_config.target_config.enabled:
-                stats = self.database_writer.write_data(processed_stream, data_source_config)
+                write_stats = self.database_writer.write_data(iter(processed_records), data_source_config)
+                # Merge write stats
+                stats.write_time_ms = write_stats.write_time_ms
+                stats.batch_count = write_stats.batch_count
+                stats.total_records = write_stats.total_records
+                stats.successful_records = write_stats.successful_records
+                stats.error_records = write_stats.error_records
             else:
-                # Print first 10 records for debugging
-                stats = self._print_sample_records(processed_stream, data_source_config)
+                print_stats = self._print_sample_records(iter(processed_records), data_source_config)
+                stats.write_time_ms = print_stats.write_time_ms
+                stats.total_records = print_stats.total_records
+                stats.successful_records = print_stats.successful_records
+
+            # Calculate final metrics
+            end_time = datetime.now()
+            stats.execution_time = end_time
+            total_duration_ms = int((end_time - start_time).total_seconds() * 1000)
+            stats.records_per_second = stats.successful_records / (
+                        total_duration_ms / 1000) if total_duration_ms > 0 else 0
+
+            # Update derived fields
+            stats.has_errors = stats.error_records > 0
+            stats.success_rate = (
+                        stats.successful_records / stats.total_records * 100) if stats.total_records > 0 else 0.0
 
             self.logger.info(
                 "Data loading execution completed",
                 data_source=data_source_name,
-                **stats.model_dump()
+                total_records=stats.total_records,
+                successful_records=stats.successful_records,
+                error_records=stats.error_records,
+                total_errors=len(stats.get_all_errors())
             )
 
             return stats
