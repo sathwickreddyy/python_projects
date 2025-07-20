@@ -96,15 +96,7 @@ class DataProcessor:
         """
         Process data stream with enhanced error tracking.
         """
-        self.start_time = datetime.now()
-
-        # Initialize stats
-        self.stats = LoadingStats(
-            execution_time=self.start_time,
-            source_name=config.type.value,
-            target_table=config.target_config.table if config.target_config else None
-        )
-
+        self._initialize_stats(config)
         self.logger.info(
             "Starting data processing with error tracking",
             data_source=config.type.value,
@@ -118,32 +110,18 @@ class DataProcessor:
             self.stats.total_records += 1
 
             if not record.is_valid():
+                yield self._handle_invalid_record(record)
                 error_count += 1
-                self.stats.error_records += 1
-
-                # Add processing error for already invalid records
-                self.stats.add_processing_error(
-                    row_number=record.row_number,
-                    error_message=record.error_message or "Record marked as invalid"
-                )
-
-                yield record
                 continue
 
             try:
-                # Apply validation on raw data before processing with error tracking
-                if config.validation:
-                    record = self._validate_record_with_tracking(
-                        record, config.validation
-                    )
+                record = self._validate_if_required(record, config)
+                if not record.is_valid():
+                    yield record
+                    error_count += 1
+                    continue
 
-                # Apply mapping strategy
-                if config.input_output_mapping.mapping_strategy == MappingStrategy.MAPPED:
-                    processed_record = self._apply_mapped_strategy_with_tracking(
-                        record, config.input_output_mapping.column_mappings
-                    )
-                else:
-                    processed_record = self._apply_direct_strategy(record)
+                processed_record = self._apply_mapping_strategy(record, config)
 
                 if processed_record.is_valid():
                     self.stats.successful_records += 1
@@ -158,28 +136,70 @@ class DataProcessor:
                     self.logger.debug(f"Processed {processed_count} records")
 
             except Exception as e:
+                yield self._handle_processing_exception(record, e)
                 error_count += 1
-                self.stats.error_records += 1
 
-                # Add processing error
-                self.stats.add_processing_error(
-                    row_number=record.row_number,
-                    error_message=f"Unexpected processing error: {str(e)}"
-                )
+        self._finalize_stats(processed_count, error_count)
 
+    # --- Modularized Helper Methods ---
+
+    def _initialize_stats(self, config: DataSourceDefinition):
+        self.start_time = datetime.now()
+        self.stats = LoadingStats(
+            execution_time=self.start_time,
+            source_name=config.type.value,
+            target_table=config.target_config.table if config.target_config else None
+        )
+
+    def _handle_invalid_record(self, record: DataRecord) -> DataRecord:
+        self.stats.error_records += 1
+        self.stats.add_processing_error(
+            row_number=record.row_number,
+            error_message=record.error_message or "Record marked as invalid"
+        )
+        return record
+
+    def _validate_if_required(self, record: DataRecord, config: DataSourceDefinition) -> DataRecord:
+        if config.validation:
+            record = self._validate_record_with_tracking(record, config.validation)
+            if not record.is_valid():
                 self.logger.error(
-                    "Record processing failed",
+                    "Record validation failed",
                     row_number=record.row_number,
-                    error_message=str(e)
+                    error_message=record.error_message
                 )
-
-                yield DataRecord.create_invalid(
+                return DataRecord.create_invalid(
                     record.get_data(),
                     record.row_number,
-                    f"Processing error: {str(e)}"
+                    f"Validation error: {record.error_message}"
                 )
+        return record
 
-        # Calculate processing time
+    def _apply_mapping_strategy(self, record: DataRecord, config: DataSourceDefinition) -> DataRecord:
+        if config.input_output_mapping.mapping_strategy == MappingStrategy.MAPPED:
+            return self._apply_mapped_strategy_with_tracking(
+                record, config.input_output_mapping.column_mappings
+            )
+        return self._apply_direct_strategy(record)
+
+    def _handle_processing_exception(self, record: DataRecord, exception: Exception) -> DataRecord:
+        self.stats.error_records += 1
+        self.stats.add_processing_error(
+            row_number=record.row_number,
+            error_message=f"Unexpected processing error: {str(exception)}"
+        )
+        self.logger.error(
+            "Record processing failed",
+            row_number=record.row_number,
+            error_message=str(exception)
+        )
+        return DataRecord.create_invalid(
+            record.get_data(),
+            record.row_number,
+            f"Processing error: {str(exception)}"
+        )
+
+    def _finalize_stats(self, processed_count: int, error_count: int):
         end_time = datetime.now()
         self.stats.process_time_ms = int((end_time - self.start_time).total_seconds() * 1000)
         self.stats.execution_time = end_time
@@ -286,7 +306,7 @@ class DataProcessor:
         for key, value in original_data.items():
             try:
                 # Convert camelCase to snake_case and uppercase
-                snake_case_key = self._camel_to_snake(key).upper()
+                snake_case_key = self._camel_to_snake(key).lower()
                 direct_data[snake_case_key] = value
             except Exception as e:
                 self.stats.add_processing_error(
@@ -314,7 +334,6 @@ class DataProcessor:
                 if required_col not in data or data[required_col] is None:
                     error_msg = f"Required column provided in validation section of config: '{required_col}' is missing or null from feed input"
                     validation_errors.append(error_msg)
-
                     self.stats.add_validation_error(
                         row_number=record.row_number,
                         field_name=required_col,
@@ -322,6 +341,8 @@ class DataProcessor:
                     )
 
         if validation_errors:
+            # 1 record can have multiple validation errors
+            self.stats.error_records += 1
             return DataRecord.create_invalid(
                 data,
                 record.row_number,
@@ -332,7 +353,6 @@ class DataProcessor:
 
     def _camel_to_snake(self, camel_str: str) -> str:
         """Convert camelCase to snake_case."""
-        import re
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', camel_str)
         return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
 

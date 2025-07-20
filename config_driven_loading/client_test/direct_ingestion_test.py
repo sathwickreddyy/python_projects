@@ -1,39 +1,25 @@
 import json
 from decimal import Decimal
 
-from db_utils import DatabaseManager
-from ingestion_utils import IngestionRunner
+from client_test.db_utils import DatabaseManager
+from client_test.ingestion_utils import IngestionRunner
 
 
-def order_details_ingestion() -> dict:
-    """Test order details ingestion with detailed structured response."""
+def direct_ingestion_test():
     engine = DatabaseManager.create_engine()
 
     try:
         with IngestionRunner(engine, config_path="data-sources.yaml") as runner:
-            available_sources_response = runner.get_available_sources_configs_in_yaml()
+            source_config_name = "user_profile_json_direct"
 
-            if not available_sources_response["success"]:
+            if source_config_name not in runner.get_available_sources_configs_in_yaml()["sources"]:
                 return {
                     "success": False,
-                    "error": "Failed to fetch available sources",
-                    "details": available_sources_response.get("error"),
-                    "step": "get_available_sources"
+                    "message": "Source configuration not found",
+                    "source_config_name": source_config_name
                 }
 
-            available_sources = available_sources_response["sources"]
-            source_name = "order_details_json"
-
-            if source_name not in available_sources:
-                return {
-                    "success": False,
-                    "error": f"Source '{source_name}' not found in configuration",
-                    "available_sources": available_sources,
-                    "step": "source_validation"
-                }
-
-            # Run ingestion
-            loading_result = runner.run_single_source(source_name)
+            loading_result = runner.run_single_source(source_config_name)
 
             ingestion_summary = {
                 "total_records": loading_result.get("total_records"),
@@ -72,7 +58,6 @@ def json_default_encoder(obj):
 
 # Usage in your main block:
 if __name__ == "__main__":
-    result = order_details_ingestion()
+    result = direct_ingestion_test()
     print(json.dumps(result, indent=2, default=json_default_encoder))
     exit(0 if result.get("success") else 1)
-    

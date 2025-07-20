@@ -71,7 +71,7 @@ data_sources:
     input_output_mapping:
       mapping_strategy: "DIRECT"  # No column_mappings needed
     validation:
-      data_quality_checks: false
+      data_quality_checks: true
 
   order_details_json:
     type: "JSON"

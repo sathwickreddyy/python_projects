@@ -83,7 +83,7 @@ class ModelConfig(BaseModel):
 class ValidationConfig(BaseModel):
     """Configuration for data validation."""
     required_columns: Optional[List[str]] = Field(None, description="List of required columns")
-    data_quality_checks: bool = Field(False, description="Enable data quality checks")
+    data_quality_checks: bool = Field(True, description="Enable data quality checks")
 
 class InputOutputMapping(BaseModel):
     mapping_strategy: MappingStrategy = Field(..., description="Mapping strategy")
