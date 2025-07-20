@@ -10,7 +10,7 @@ def user_profiles_ingestion() -> dict:
 
     try:
         with IngestionRunner(engine, config_path="data-sources.yaml") as runner:
-            available_sources_response = runner.get_available_sources()
+            available_sources_response = runner.get_available_sources_configs_in_yaml()
 
             if not available_sources_response["success"]:
                 return {
