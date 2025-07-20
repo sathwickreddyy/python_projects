@@ -1,95 +1,136 @@
-# test_order_details_ingestion.py
-"""
-Order details ingestion test using MAPPED strategy.
+import json
+from decimal import Decimal
 
-@author sathwick
-"""
 from db_utils import DatabaseManager
 from ingestion_utils import IngestionRunner
 
 
-def order_details_ingestion():
-    """Test order details ingestion with comprehensive validation."""
-    print("📦 Order Details Ingestion Test (MAPPED Strategy)")
-    print("=" * 52)
-
+def order_details_ingestion() -> dict:
+    """Test order details ingestion with detailed structured response."""
     engine = DatabaseManager.create_engine()
 
     try:
         with IngestionRunner(engine, config_path="data-sources.yaml") as runner:
+            available_sources_response = runner.get_available_sources()
+
+            if not available_sources_response["success"]:
+                return {
+                    "success": False,
+                    "error": "Failed to fetch available sources",
+                    "details": available_sources_response.get("error"),
+                    "step": "get_available_sources"
+                }
+
+            available_sources = available_sources_response["sources"]
             source_name = "order_details_json"
 
-            # Check if source exists
-            available_sources = runner.get_available_sources()
             if source_name not in available_sources:
-                print(f"❌ Source '{source_name}' not available")
-                return False
+                return {
+                    "success": False,
+                    "error": f"Source '{source_name}' not found in configuration",
+                    "available_sources": available_sources,
+                    "step": "source_validation"
+                }
 
-            print(f"✅ Source '{source_name}' found")
+            # Run ingestion
+            loading_result = runner.run_single_source(source_name)
 
-            # Execute ingestion
-            print(f"\n🚀 Starting order details ingestion...")
-            result = runner.run_single_source(source_name, print_stats=False)
+            ingestion_summary = {
+                "total_records": loading_result.get("total_records"),
+                "successful_records": loading_result.get("successful_records"),
+                "failed_records": loading_result.get("failed_records"),
+                "duration_ms": loading_result.get("write_duration_ms"),
+                "throughput": loading_result.get("throughput_records_per_sec"),
+                "errors": loading_result.get("errors"),
+                "error_summary": loading_result.get("error_summary"),
+                "status": loading_result.get("status"),
+            }
 
-            if result:
-                print("✅ Ingestion was successful")
-                print(f"\n🔍 Validating inserted data...")
-                _validate_order_data(engine)
-                return True
-            else:
-                print(f"❌ Ingestion failed: {result['error']}")
-                return False
+            # Validate inserted data
+            _validate_order_data(engine)
+
+            return {
+                "success": loading_result.get("success"),
+                "partial_success": loading_result.get("partial_success"),
+                "ingestion_summary": ingestion_summary,
+            }
 
     except Exception as e:
-        print(f"❌ Test execution failed: {str(e)}")
-        return False
+        return {
+            "success": False,
+            "error": str(e),
+            "step": "exception"
+        }
     finally:
         engine.dispose()
 
 
-def _validate_order_data(engine):
+def _validate_order_data(engine) -> dict:
     """Validate order data in database."""
-    try:
-        from sqlalchemy import text
+    from sqlalchemy import text
 
+    try:
         with engine.connect() as conn:
             # Count orders
             result = conn.execute(text("SELECT COUNT(*) FROM order_details"))
             count = result.fetchone()[0]
-            print(f"   Total orders in database: {count}")
 
-            # Check data types and sample records
-            result = conn.execute(text("""
+            # Sample records
+            sample_query = text("""
                 SELECT order_id, customer_name, total_amount, order_status, created_date
                 FROM order_details 
                 ORDER BY created_date 
                 LIMIT 3
-            """))
+            """)
+            sample_result = conn.execute(sample_query)
+            rows = [
+                {
+                    "order_id": row.order_id,
+                    "customer_name": row.customer_name,
+                    "total_amount": row.total_amount,
+                    "order_status": row.order_status,
+                    "created_date": row.created_date.isoformat() if row.created_date else None,
+                }
+                for row in sample_result.fetchall()
+            ]
 
-            print(f"   Sample orders:")
-            for row in result.fetchall():
-                print(f"     - {row.order_id}: {row.customer_name}, ${row.total_amount}, {row.order_status}")
-
-            # Check for any null values in required fields
-            result = conn.execute(text("""
+            # Check for null values in important fields
+            nulls_query = text("""
                 SELECT 
                     SUM(CASE WHEN order_id IS NULL THEN 1 ELSE 0 END) as null_order_ids,
                     SUM(CASE WHEN customer_name IS NULL THEN 1 ELSE 0 END) as null_names
                 FROM order_details
-            """))
+            """)
+            null_counts = conn.execute(nulls_query).fetchone()
 
-            null_counts = result.fetchone()
-            if null_counts.null_order_ids > 0 or null_counts.null_names > 0:
-                print(f"   ⚠️ Found null values in required fields")
-                print(f"     Null order_ids: {null_counts.null_order_ids}")
-                print(f"     Null names: {null_counts.null_names}")
-            else:
-                print(f"   ✅ No null values in required fields")
+            return {
+                "record_count": count,
+                "sample_records": rows,
+                "null_checks": {
+                    "null_order_ids": null_counts.null_order_ids,
+                    "null_customer_names": null_counts.null_names
+                },
+                "validation_success": (null_counts.null_order_ids == 0 and null_counts.null_names == 0)
+            }
 
     except Exception as e:
-        print(f"   ❌ Data validation failed: {str(e)}")
+        return {
+            "validation_success": False,
+            "error": str(e)
+        }
 
 
+
+def json_default_encoder(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if hasattr(obj, 'isoformat'):
+        return obj.isoformat()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
+# Usage in your main block:
 if __name__ == "__main__":
-    success = order_details_ingestion()
-    exit(0 if success else 1)
+    result = order_details_ingestion()
+    print(json.dumps(result, indent=2, default=json_default_encoder))
+    exit(0 if result.get("success") else 1)
