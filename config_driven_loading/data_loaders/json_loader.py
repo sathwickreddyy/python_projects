@@ -32,16 +32,6 @@ from models.core.base_types import DataSourceType, MappingStrategy
 
 
 class JSONDataLoader(BaseDataLoader):
-    """
-    JSON data loader with comprehensive nested path support.
-
-    Features:
-    - JSONPath expression support
-    - Dot notation for nested field access
-    - Array element access (items[0])
-    - Resilient error handling for malformed or unexpected JSON formats
-    - Configurable through DataSourceDefinition
-    """
 
     def get_type(self) -> DataSourceType:
         """Return the JSON loader type identifier."""
@@ -180,19 +170,18 @@ class JSONDataLoader(BaseDataLoader):
                 value = self._extract_value_from_path(node, source_path)
 
                 if value is not None:
-                    data[target_field] = value
+                    data[source_path] = value
                 elif mapping.default_value is not None:
-                    data[target_field] = mapping.default_value
+                    data[source_path] = mapping.default_value
 
             except Exception as e:
                 self.logger.warning(
                     "Failed to extract value from path",
                     source_path=source_path,
-                    target_field=target_field,
                     error_message=str(e)
                 )
                 if mapping.default_value is not None:
-                    data[target_field] = mapping.default_value
+                    data[source_path] = mapping.default_value
 
         return data
 

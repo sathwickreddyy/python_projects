@@ -24,12 +24,12 @@ Summary of the flow:
 @author sathwick
 """
 
-from typing import Iterator, List, Dict, Any, Set
+from typing import Iterator, List, Dict, Any
 from datetime import datetime
-from sqlalchemy import text, MetaData, inspect
+from sqlalchemy import text, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import NoSuchTableError, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 from models.data_record import DataRecord
 from config.data_loader_config import DataSourceDefinition
 from models.core.base_types import LoadingStats
@@ -38,43 +38,17 @@ from models.core.logging_config import DataIngestionLogger
 
 
 class DatabaseWriter:
-    """
-    High-performance, schema-validated database writer with:
-    - Batch processing with configurable batch sizes
-    - Schema column validation via reflection
-    - Transaction management with automatic rollback
-    - Comprehensive logging and audit trail
-    - Column filtering to prevent SQL injection
-    - Performance monitoring and metrics collection
-    """
+    """Enhanced database writer with fail-fast behavior for data quality."""
 
     def __init__(self, engine: Engine):
-        """
-        Initialize with SQLAlchemy engine.
-
-        Args:
-            engine (Engine): SQLAlchemy Engine for database connectivity.
-        """
+        """Initialize with SQLAlchemy engine."""
         self.engine = engine
         self.logger = DataIngestionLogger(__name__)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        # Cache for validated columns to avoid repeated reflection
         self._column_cache: Dict[str, List[str]] = {}
 
     def write_data(self, data_stream: Iterator[DataRecord], config: DataSourceDefinition) -> LoadingStats:
-        """
-        Write data stream to target database table with batch processing and transaction handling.
-
-        Args:
-            data_stream (Iterator[DataRecord]): Stream of data records to write.
-            config (DataSourceDefinition): Configuration holding target schema and table details.
-
-        Returns:
-            LoadingStats: Contains detailed metrics about the write operation.
-
-        Raises:
-            DatabaseWriteException: Raised if database operations fail.
-        """
+        """Write data stream with fail-fast behavior for invalid records."""
         start_time = datetime.now()
         target = config.target_config
         batch_size = target.batch_size or 1000
@@ -87,7 +61,11 @@ class DatabaseWriter:
             enabled=target.enabled
         )
 
-        # Reflect schema to validate columns before starting
+        # Check if target is disabled - print records instead of writing
+        if not target.enabled:
+            return self._print_sample_records(data_stream, target, start_time)
+
+        # Validate schema
         valid_columns = self._get_validated_columns(target)
         if not valid_columns:
             raise DatabaseWriteException(f"No valid columns found for table '{target.schema_name}.{target.table}'")
@@ -100,14 +78,14 @@ class DatabaseWriter:
         try:
             with self.SessionLocal() as session:
                 batch = []
-                
+
                 for record in data_stream:
                     total_records += 1
 
                     if not record.is_valid():
                         error_records += 1
                         self.logger.warning(
-                            "Skipping invalid record",
+                            "Skipping invalid record - fail fast enabled",
                             row_number=record.row_number,
                             error_message=record.error_message
                         )
@@ -116,18 +94,31 @@ class DatabaseWriter:
                     batch.append(record)
 
                     if len(batch) >= batch_size:
-                        success_count = self._execute_batch(session, batch, target, valid_columns)
+                        success_count, batch_errors = self._execute_batch(session, batch, target, valid_columns)
                         successful_records += success_count
+                        error_records += batch_errors
                         batch_count += 1
                         batch.clear()
 
                 # Process remaining records
                 if batch:
-                    success_count = self._execute_batch(session, batch, target, valid_columns)
+                    success_count, batch_errors = self._execute_batch(session, batch, target, valid_columns)
                     successful_records += success_count
+                    error_records += batch_errors
                     batch_count += 1
 
-                session.commit()
+                # Only commit if no errors occurred
+                if error_records > 0:
+                    self.logger.error(
+                        "Rolling back transaction due to processing errors",
+                        total_errors=error_records,
+                        successful_records=successful_records
+                    )
+                    session.rollback()
+                    successful_records = 0  # Reset since we rolled back
+                    raise DatabaseWriteException(f"Transaction rolled back due to {error_records} record errors")
+                else:
+                    session.commit()
 
             end_time = datetime.now()
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
@@ -144,13 +135,11 @@ class DatabaseWriter:
             )
 
             self.logger.info(
-                "Database write completed successfully",
+                "Database write completed",
                 **stats.dict()
             )
 
-            # Record audit trail
             self._record_audit_trail(config, stats)
-
             return stats
 
         except Exception as e:
@@ -159,52 +148,182 @@ class DatabaseWriter:
                 error_message=str(e),
                 table=f"{target.schema_name}.{target.table}"
             )
-            raise DatabaseWriteException(f"Database write failed: {str(e)}", e)
+
+            # Create failed stats
+            end_time = datetime.now()
+            duration_ms = int((end_time - start_time).total_seconds() * 1000)
+
+            failed_stats = LoadingStats(
+                write_time_ms=duration_ms,
+                batch_count=batch_count,
+                records_per_second=0.0,
+                total_records=total_records,
+                successful_records=0,  # No records written due to rollback
+                error_records=total_records,  # All records considered failed
+                execution_time=end_time
+            )
+
+            return failed_stats
+
+    def _execute_batch(self, session, batch: List[DataRecord], target, valid_columns: List[str]) -> tuple[int, int]:
+        """Execute a batch and return (successful_count, error_count)."""
+        if not batch:
+            return 0, 0
+
+        try:
+            table_name = f"{target.schema_name}.{target.table}"
+
+            # Get intersection of record columns and valid columns
+            first_record_columns = set(batch[0].get_data().keys())
+            insert_columns = [col for col in valid_columns if col in first_record_columns]
+
+            if not insert_columns:
+                self.logger.error(
+                    "No matching columns between data and schema",
+                    data_columns=list(first_record_columns),
+                    schema_columns=valid_columns[:10]
+                )
+                return 0, len(batch)
+
+            # Prepare batch data
+            batch_data = []
+            successful_count = 0
+
+            for record in batch:
+                try:
+                    record_data = record.get_data()
+                    filtered_data = {
+                        col: record_data.get(col)
+                        for col in insert_columns
+                        if col in record_data
+                    }
+
+                    if filtered_data:
+                        batch_data.append(filtered_data)
+                        successful_count += 1
+                    else:
+                        self.logger.warning(
+                            "Record has no valid columns",
+                            row_number=record.row_number
+                        )
+
+                except Exception as e:
+                    self.logger.error(
+                        "Failed to prepare record for batch",
+                        row_number=record.row_number,
+                        error_message=str(e)
+                    )
+
+            if batch_data:
+                # Build and execute INSERT
+                column_placeholders = ', '.join([f':{col}' for col in insert_columns])
+                column_names = ', '.join(insert_columns)
+                insert_sql = f"INSERT INTO {table_name} ({column_names}) VALUES ({column_placeholders})"
+
+                session.execute(text(insert_sql), batch_data)
+
+                self.logger.debug(
+                    "Batch executed successfully",
+                    batch_size=len(batch_data),
+                    table=table_name
+                )
+
+                return successful_count, 0
+            else:
+                self.logger.warning("No valid records in batch")
+                return 0, len(batch)
+
+        except SQLAlchemyError as e:
+            self.logger.error(
+                "SQL error during batch execution",
+                batch_size=len(batch),
+                table=f"{target.schema_name}.{target.table}",
+                error_message=str(e)
+            )
+            # Return all records as failed for this batch
+            return 0, len(batch)
+        except Exception as e:
+            self.logger.error(
+                "Unexpected error during batch execution",
+                batch_size=len(batch),
+                error_message=str(e)
+            )
+            return 0, len(batch)
+
+    def _print_sample_records(self, data_stream: Iterator[DataRecord], target, start_time: datetime) -> LoadingStats:
+        """Print sample records when target is disabled."""
+        print(f"\n{'=' * 70}")
+        print(f"📋 SAMPLE RECORDS TO BE INSERTED INTO {target.schema_name}.{target.table}")
+        print(f"{'=' * 70}")
+
+        records_processed = 0
+        valid_records = 0
+        error_records = 0
+        sample_count = 0
+        max_samples = 15
+
+        for record in data_stream:
+            records_processed += 1
+
+            if not record.is_valid():
+                error_records += 1
+                print(f"❌ Record {record.row_number}: {record.error_message}")
+                continue
+
+            valid_records += 1
+
+            if sample_count < max_samples:
+                sample_count += 1
+                print(f"\n📄 Record {record.row_number}:")
+                for key, value in record.get_data().items():
+                    print(f"   {key}: {value}")
+                print("-" * 50)
+
+        if records_processed > max_samples:
+            remaining = records_processed - sample_count
+            print(f"... and {remaining} more records")
+
+        print(f"\n📊 SUMMARY:")
+        print(f"   Total records: {records_processed}")
+        print(f"   Valid records: {valid_records}")
+        print(f"   Invalid records: {error_records}")
+        print(f"   Sample shown: {min(sample_count, max_samples)}")
+        print(f"{'=' * 70}")
+
+        end_time = datetime.now()
+        duration_ms = int((end_time - start_time).total_seconds() * 1000)
+
+        return LoadingStats(
+            write_time_ms=duration_ms,
+            batch_count=0,
+            records_per_second=0.0,
+            total_records=records_processed,
+            successful_records=0,  # No actual database writes
+            error_records=error_records,
+            execution_time=end_time
+        )
 
     def _get_validated_columns(self, target) -> List[str]:
-        """
-        Get validated columns with caching to improve performance.
-        
-        Args:
-            target: Target configuration containing schema and table info
-            
-        Returns:
-            List[str]: Validated column names
-        """
+        """Get validated columns with caching."""
         cache_key = f"{target.schema_name}.{target.table}"
-        
+
         if cache_key in self._column_cache:
-            self.logger.debug(f"Using cached columns for {cache_key}")
             return self._column_cache[cache_key]
-        
+
         columns = self._validate_columns(target)
         self._column_cache[cache_key] = columns
         return columns
 
     def _validate_columns(self, target) -> List[str]:
-        """
-        Validate target table schema and return valid columns via reflection.
-
-        Args:
-            target: Configuration object containing schema and table.
-
-        Returns:
-            List[str]: Validated list of column names for safe writes.
-
-        Raises:
-            DatabaseWriteException: If table does not exist or reflection fails.
-        """
+        """Validate target table schema."""
         try:
-            # Use inspector for more reliable schema reflection
             inspector = inspect(self.engine)
-            
-            # Check if table exists
+
             if not inspector.has_table(target.table, schema=target.schema_name):
                 raise DatabaseWriteException(
                     f"Table '{target.schema_name}.{target.table}' does not exist"
                 )
-            
-            # Get column information
+
             columns_info = inspector.get_columns(target.table, schema=target.schema_name)
             columns = [col['name'] for col in columns_info]
 
@@ -218,133 +337,18 @@ class DatabaseWriter:
                 schema=target.schema_name,
                 table=target.table,
                 column_count=len(columns),
-                columns=columns[:10]  # Log first 10 columns to avoid log spam
+                columns=columns[:10]
             )
-            
+
             return columns
 
-        except NoSuchTableError:
-            raise DatabaseWriteException(
-                f"Table '{target.schema_name}.{target.table}' does not exist"
-            )
-        except SQLAlchemyError as e:
-            raise DatabaseWriteException(
-                f"Database error while validating columns for '{target.schema_name}.{target.table}': {str(e)}"
-            )
         except Exception as e:
             raise DatabaseWriteException(
                 f"Failed to validate columns for '{target.schema_name}.{target.table}': {str(e)}"
             )
 
-    def _execute_batch(self, session, batch: List[DataRecord], target, valid_columns: List[str]) -> int:
-        """
-        Execute a batch insert safely into the target table.
-
-        Args:
-            session: SQLAlchemy session.
-            batch (List[DataRecord]): Batch of records to insert.
-            target: Target schema/table configuration.
-            valid_columns (List[str]): Schema-reflected valid columns.
-
-        Returns:
-            int: Count of successful records inserted.
-        """
-        if not batch:
-            return 0
-
-        try:
-            table_name = f"{target.schema_name}.{target.table}"
-            
-            # Get the intersection of record columns and valid columns
-            first_record_columns = set(batch[0].get_data().keys())
-            insert_columns = [col for col in valid_columns if col in first_record_columns]
-            
-            if not insert_columns:
-                self.logger.warning(
-                    "No matching columns between data and schema",
-                    data_columns=list(first_record_columns),
-                    schema_columns=valid_columns[:10]  # Limit for logging
-                )
-                return 0
-            
-            # Build INSERT SQL with only valid columns
-            column_placeholders = ', '.join([f':{col}' for col in insert_columns])
-            column_names = ', '.join(insert_columns)
-            
-            insert_sql = f"INSERT INTO {table_name} ({column_names}) VALUES ({column_placeholders})"
-
-            # Prepare batch data with only valid columns
-            batch_data = []
-            successful_count = 0
-            
-            for record in batch:
-                try:
-                    record_data = record.get_data()
-                    # Filter to only include columns that exist in both data and schema
-                    filtered_data = {
-                        col: record_data.get(col) 
-                        for col in insert_columns 
-                        if col in record_data
-                    }
-                    
-                    # Skip records that don't have any valid columns
-                    if filtered_data:
-                        batch_data.append(filtered_data)
-                        successful_count += 1
-                    else:
-                        self.logger.warning(
-                            "Skipping record with no valid columns",
-                            row_number=record.row_number
-                        )
-                        
-                except Exception as e:
-                    self.logger.warning(
-                        "Failed to prepare record for batch",
-                        row_number=record.row_number,
-                        error_message=str(e)
-                    )
-
-            if batch_data:
-                # Execute the batch insert
-                session.execute(text(insert_sql), batch_data)
-                
-                self.logger.debug(
-                    "Batch executed successfully",
-                    batch_size=len(batch_data),
-                    table=table_name,
-                    columns_inserted=len(insert_columns)
-                )
-                
-                return successful_count
-            else:
-                self.logger.warning("No valid records in batch, skipping insert")
-                return 0
-
-        except SQLAlchemyError as e:
-            self.logger.error(
-                "SQL error during batch execution",
-                batch_size=len(batch),
-                table=f"{target.schema_name}.{target.table}",
-                error_message=str(e)
-            )
-            return 0
-        except Exception as e:
-            self.logger.error(
-                "Unexpected error during batch execution",
-                batch_size=len(batch),
-                table=f"{target.schema_name}.{target.table}",
-                error_message=str(e)
-            )
-            return 0
-
     def _record_audit_trail(self, config: DataSourceDefinition, stats: LoadingStats):
-        """
-        Record audit trail entry after write completion.
-
-        Args:
-            config (DataSourceDefinition): Configuration with target info.
-            stats (LoadingStats): Metrics from the write operation.
-        """
+        """Record audit trail."""
         try:
             with self.SessionLocal() as session:
                 audit_sql = """
@@ -377,40 +381,8 @@ class DatabaseWriter:
                 table=config.target_config.table,
                 error_message=str(e)
             )
-            # Don't raise exception for audit failures
 
     def clear_column_cache(self):
         """Clear the column validation cache."""
         self._column_cache.clear()
         self.logger.info("Column validation cache cleared")
-
-    def get_table_info(self, schema_name: str, table_name: str) -> Dict[str, Any]:
-        """
-        Get detailed table information for debugging purposes.
-        
-        Args:
-            schema_name: Database schema name
-            table_name: Table name
-            
-        Returns:
-            Dict containing table metadata
-        """
-        try:
-            inspector = inspect(self.engine)
-            
-            if not inspector.has_table(table_name, schema=schema_name):
-                return {"exists": False}
-            
-            columns = inspector.get_columns(table_name, schema=schema_name)
-            primary_keys = inspector.get_pk_constraint(table_name, schema=schema_name)
-            
-            return {
-                "exists": True,
-                "columns": [{"name": col["name"], "type": str(col["type"])} for col in columns],
-                "primary_keys": primary_keys.get("constrained_columns", []),
-                "column_count": len(columns)
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Failed to get table info: {str(e)}")
-            return {"exists": False, "error": str(e)}

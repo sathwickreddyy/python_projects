@@ -34,19 +34,7 @@ class DataTypeConverter:
         ]
 
     def convert_for_database(self, value: Any, mapping: ColumnMapping) -> Any:
-        """
-        Convert value to appropriate type for database insertion.
-
-        Args:
-            value: Raw input value to convert
-            mapping: Column mapping configuration
-
-        Returns:
-            Converted value ready for database insertion
-
-        Raises:
-            DataConversionException: If conversion fails
-        """
+        """Convert value with enhanced error logging."""
         if value is None or (isinstance(value, str) and value.strip() == ''):
             return self._handle_null_value(mapping)
 
@@ -70,6 +58,8 @@ class DataTypeConverter:
                 result = converter(value_str)
                 self.logger.debug(
                     "Converted value successfully",
+                    source_field=mapping.source,
+                    target_field=mapping.target,
                     original_value=value,
                     converted_value=result,
                     data_type=mapping.data_type.value
@@ -80,12 +70,18 @@ class DataTypeConverter:
 
         except Exception as e:
             error_msg = f"Failed to convert value '{value}' to type '{mapping.data_type.value}': {str(e)}"
+
+            # Enhanced error logging
             self.logger.error(
-                "Data conversion error",
+                "Data conversion error - CRITICAL",
+                source_field=mapping.source,
+                target_field=mapping.target,
                 original_value=value,
                 target_type=mapping.data_type.value,
-                error_message=str(e)
+                error_message=str(e),
+                source_date_format=mapping.source_date_format if mapping.source_date_format else "N/A"
             )
+
             raise DataConversionException(error_msg, e)
 
     def _handle_null_value(self, mapping: ColumnMapping) -> Any:

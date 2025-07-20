@@ -42,7 +42,7 @@ class IngestionRunner:
         if self.client:
             self.client.close()
 
-    def run_single_source(self, source_name: str, print_stats: bool = True) -> Dict[str, Any]:
+    def run_single_source(self, source_name: str, print_stats: bool = True) -> bool:
         """
         Run ingestion for a single data source.
 
@@ -56,34 +56,12 @@ class IngestionRunner:
         try:
             stats = self.client.execute_data_source(source_name)
 
-            result = {
-                "success": True,
-                "source_name": source_name,
-                "total_records": stats.total_records,
-                "successful_records": stats.successful_records,
-                "error_records": stats.error_records,
-                "duration_ms": stats.write_time_ms,
-                "throughput": stats.records_per_second,
-                "batch_count": stats.batch_count,
-                "errors": stats.get_all_errors()
-            }
-
+            return self._print_execution_summary(stats)
+        except Exception as exception:
             if print_stats:
-                self._print_execution_summary(result)
+                print(f"❌ Failed to execute {source_name}: {str(exception)}")
 
-            return result
-
-        except Exception as e:
-            result = {
-                "success": False,
-                "source_name": source_name,
-                "error": str(e)
-            }
-
-            if print_stats:
-                print(f"❌ Failed to execute {source_name}: {str(e)}")
-
-            return result
+            return False
 
     def run_multiple_sources(self, source_names: List[str]) -> Dict[str, Dict[str, Any]]:
         """
@@ -118,24 +96,42 @@ class IngestionRunner:
         """Get list of available data sources."""
         return self.client.get_available_sources()
 
-    def _print_execution_summary(self, result: Dict[str, Any]):
+    def _print_execution_summary(self, stats) -> bool:
         """Print formatted execution summary."""
-        if result["success"]:
-            print(f"✅ Success: {result['successful_records']}/{result['total_records']} records")
-            print(f"   Duration: {result['duration_ms']}ms")
-            print(f"   Throughput: {result['throughput']:.2f} records/sec")
-            if result['batch_count'] > 0:
-                print(f"   Batches: {result['batch_count']}")
-            if result["error_records"] > 0:
-                print(f"⚠️  Errors: {result['error_records']} records failed")
-                if result["errors"]:
-                    print("   Error details:")
-                    for error in result["errors"][:3]:  # Show first 3 errors
-                        print(f"     - {error}")
-                    if len(result["errors"]) > 3:
-                        print(f"     ... and {len(result['errors']) - 3} more")
+        if stats.total_records == 0:
+            print("⚠️ No records were processed.")
+            return False
+
+        if stats.error_records == stats.total_records:
+            print(f"❌ Ingestion Failed due to {stats.error_records} errors in feed records failed.")
+            errors = stats.get_all_errors()
+            if errors:
+                print("   Error details:")
+                for error in errors[:10]:  # Show first 10 errors
+                    print(f"     - {error}")
+                if len(errors) > 10:
+                    print(f"     ... and {len(errors) - 10} more")
+            return False
+        elif stats.error_records == 0:
+            print(f"✅ Success: {stats.successful_records}/{stats.total_records} records")
         else:
-            print(f"❌ Failed: {result['error']}")
+            print(f"⚠️ Partial Success: {stats.successful_records}/{stats.total_records} records")
+
+        print(f"   Duration: {stats.write_time_ms}ms")
+        print(f"   Throughput: {stats.records_per_second:.2f} records/sec")
+        print(f"   Average per record: {stats.write_time_ms / max(stats.total_records, 1):.1f}ms")
+
+        if stats.batch_count > 0:
+            print(f"   Batches: {stats.batch_count}")
+
+        if stats.error_records > 0:
+            print(f"❌  Errors: {stats.error_records} records failed")
+            errors = stats.get_all_errors()
+            if errors:
+                print("   Error details:")
+                for error in errors:
+                    print(f"     - {error}")
+        return True
 
     def _print_overall_summary(self, results: Dict[str, Dict[str, Any]]):
         """Print overall summary for multiple sources."""

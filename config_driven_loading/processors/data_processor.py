@@ -1,4 +1,3 @@
-# app/processors/data_processor.py
 """
 Data processor for transforming and validating data records.
 
@@ -8,6 +7,7 @@ from datetime import datetime
 from typing import Iterator, List
 
 import re
+
 from models.core.base_types import MappingStrategy, LoadingStats
 from models.data_record import DataRecord
 from config.data_loader_config import DataSourceDefinition, ColumnMapping
@@ -131,6 +131,12 @@ class DataProcessor:
                 continue
 
             try:
+                # Apply validation on raw data before processing with error tracking
+                if config.validation:
+                    record = self._validate_record_with_tracking(
+                        record, config.validation
+                    )
+
                 # Apply mapping strategy
                 if config.input_output_mapping.mapping_strategy == MappingStrategy.MAPPED:
                     processed_record = self._apply_mapped_strategy_with_tracking(
@@ -138,12 +144,6 @@ class DataProcessor:
                     )
                 else:
                     processed_record = self._apply_direct_strategy(record)
-
-                # Apply validation with error tracking
-                if config.validation:
-                    processed_record = self._validate_record_with_tracking(
-                        processed_record, config.validation
-                    )
 
                 if processed_record.is_valid():
                     self.stats.successful_records += 1
@@ -225,7 +225,9 @@ class DataProcessor:
                             field_value=source_value
                         )
                         # Continue processing other fields
-                        continue
+                        return DataRecord.create_invalid(original_data,
+                                                         record.row_number,
+                                                         error_message=str(e))
 
                 elif mapping.default_value is not None:
                     try:
@@ -234,25 +236,32 @@ class DataProcessor:
                         )
                         mapped_data[target_key] = converted_value
                     except DataConversionException as e:
+                        err_msg = f"Default value conversion failed: {str(e)}"
                         self.stats.add_conversion_error(
                             row_number=record.row_number,
                             field_name=source_key,
-                            error_message=f"Default value conversion failed: {str(e)}",
+                            error_message=err_msg,
                             field_value=mapping.default_value
                         )
-                        continue
+                        return DataRecord.create_invalid(original_data, record.row_number, error_message=err_msg)
 
                 elif mapping.required:
+                    error_message = f"Source field provided in column mappings of config:'{source_key}' is missing/null in feed input"
                     # Add validation error for missing required field
                     self.stats.add_validation_error(
                         row_number=record.row_number,
                         field_name=source_key,
-                        error_message="Required field is missing or null"
+                        error_message=error_message,
+                    )
+                    self.logger.error(
+                        "Processing Error",
+                        row_number=record.row_number,
+                        error_message=record.error_message
                     )
                     return DataRecord.create_invalid(
                         original_data,
                         record.row_number,
-                        f"Required field '{source_key}' is missing"
+                        error_message=error_message,
                     )
 
             except Exception as e:
@@ -303,7 +312,7 @@ class DataProcessor:
         if validation_config.required_columns:
             for required_col in validation_config.required_columns:
                 if required_col not in data or data[required_col] is None:
-                    error_msg = f"Required column '{required_col}' is missing or null"
+                    error_msg = f"Required column provided in validation section of config: '{required_col}' is missing or null from feed input"
                     validation_errors.append(error_msg)
 
                     self.stats.add_validation_error(
