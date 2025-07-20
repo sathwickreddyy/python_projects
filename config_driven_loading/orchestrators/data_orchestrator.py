@@ -92,6 +92,10 @@ class DataOrchestrator:
             processing_stats.batch_count = write_stats.batch_count
             processing_stats.records_per_second = write_stats.records_per_second
             processing_stats.execution_time = write_end
+            # processing_stats.error_details = write_stats.error_details
+            if processing_stats.error_records == 0 and write_stats.error_records:
+                self.logger.error("No Processing Errors Found, Overriding error records with DB Write Errors")
+                processing_stats = write_stats
 
             # Merge processing errors if available
             if processing_stats:

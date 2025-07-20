@@ -1,8 +1,8 @@
-# ingestion_utils.py (Refactored)
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
+
 from sqlalchemy import Engine
+
 from client.data_ingestion_client import DataIngestionClient
-from db_utils import DatabaseManager
 
 
 class IngestionRunner:

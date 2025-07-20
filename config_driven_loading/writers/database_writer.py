@@ -145,7 +145,7 @@ class DatabaseWriter:
         except Exception as e:
             self.logger.error(
                 "Database write failed",
-                error_message=str(e),
+                error_message=str(e.__cause__),
                 table=f"{target.schema_name}.{target.table}"
             )
 
@@ -161,6 +161,11 @@ class DatabaseWriter:
                 successful_records=0,  # No records written due to rollback
                 error_records=total_records,  # All records considered failed
                 execution_time=end_time
+            )
+
+            failed_stats.add_processing_error(
+                row_number=-1,
+                error_message=str(e.__cause__),
             )
 
             return failed_stats
@@ -238,17 +243,17 @@ class DatabaseWriter:
                 "SQL error during batch execution",
                 batch_size=len(batch),
                 table=f"{target.schema_name}.{target.table}",
-                error_message=str(e)
+                error_message=str(e.__cause__)
             )
             # Return all records as failed for this batch
-            return 0, len(batch)
+            raise e
         except Exception as e:
             self.logger.error(
                 "Unexpected error during batch execution",
                 batch_size=len(batch),
                 error_message=str(e)
             )
-            return 0, len(batch)
+            raise e
 
     def _print_sample_records(self, data_stream: Iterator[DataRecord], target, start_time: datetime) -> LoadingStats:
         """Print sample records when target is disabled."""
