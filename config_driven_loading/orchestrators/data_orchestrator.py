@@ -3,6 +3,7 @@ Data orchestrator for managing end-to-end data loading operations.
 
 @author sathwick
 """
+from datetime import datetime
 from typing import Dict, Iterator
 from sqlalchemy.engine import Engine
 from config.data_loader_config import DataLoaderConfiguration, DataSourceDefinition
@@ -73,7 +74,8 @@ class DataOrchestrator:
             "Starting data loading execution",
             data_source=data_source_name,
             source_type=data_source_config.type,
-            target_table=data_source_config.target.table
+            target_table=data_source_config.target_config.table,
+            target_enabled=data_source_config.target_config.enabled
         )
 
         try:
@@ -83,8 +85,12 @@ class DataOrchestrator:
             # Step 2: Process data (transformation, validation)
             processed_stream = self._process_data_stream(data_stream, data_source_config)
 
-            # Step 3: Write to database
-            stats = self.database_writer.write_data(processed_stream, data_source_config)
+            # Step 3: Write to database or print records based on enabled flag
+            if data_source_config.target_config.enabled:
+                stats = self.database_writer.write_data(processed_stream, data_source_config)
+            else:
+                # Print first 10 records for debugging
+                stats = self._print_sample_records(processed_stream, data_source_config)
 
             self.logger.info(
                 "Data loading execution completed",
@@ -128,64 +134,9 @@ class DataOrchestrator:
 
         return results
 
-    # def load_models_to_database(self, models: List[Any], table_name: str, schema_name: str = "public") -> LoadingStats:
-    #     """
-    #     Load a list of model objects directly to database.
-    #
-    #     Args:
-    #         models: List of model objects to load
-    #         table_name: Target table name
-    #         schema_name: Target schema name
-    #
-    #     Returns:
-    #         LoadingStats with execution metrics
-    #     """
-    #     self.logger.info(
-    #         "Loading models to database",
-    #         model_count=len(models),
-    #         table_name=table_name,
-    #         schema_name=schema_name
-    #     )
-    #
-    #     try:
-    #         # Convert models to data records
-    #         data_records = self._convert_models_to_records(models)
-    #
-    #         # Create temporary configuration
-    #         from config.data_loader_config import TargetConfig
-    #         target_config = TargetConfig(
-    #             schema_name=schema_name,
-    #             table=table_name,
-    #             batch_size=1000
-    #         )
-    #
-    #         # Create temporary data source definition
-    #         temp_config = type('TempConfig', (), {
-    #             'target': target_config,
-    #             'type': 'MODEL',
-    #             'identifier': f'model_loading_{table_name}'
-    #         })()
-    #
-    #         # Write to database
-    #         stats = self.database_writer.write_data(iter(data_records), temp_config)
-    #
-    #         self.logger.info(
-    #             "Models loaded to database successfully",
-    #             **stats.dict()
-    #         )
-    #
-    #         return stats
-    #
-    #     except Exception as e:
-    #         self.logger.error(
-    #             "Failed to load models to database",
-    #             error_message=str(e)
-    #         )
-    #         raise DataIngestionException(f"Model loading failed: {str(e)}", e)
-    #
     def _load_data_from_source(self, config: DataSourceDefinition) -> Iterator[DataRecord]:
         """Load data from configured source."""
-        loader = self.loaders.get(config.type.value)
+        loader = self.loaders.get(config.type)
         if not loader:
             raise DataIngestionException(f"No loader available for type: {config.type.value}")
 
@@ -196,33 +147,40 @@ class DataOrchestrator:
         """Process data stream with transformations and validation."""
         return self.data_processor.process_data(data_stream, config)
 
-    # def _convert_models_to_records(self, models: List[Any]) -> List[DataRecord]:
-    #     """Convert model objects to DataRecord objects."""
-    #     records = []
-    #
-    #     for i, model in enumerate(models, 1):
-    #         try:
-    #             # Convert model to dictionary
-    #             if hasattr(model, 'dict'):
-    #                 # Pydantic model
-    #                 data = model.dict()
-    #             elif hasattr(model, '__dict__'):
-    #                 # Regular class
-    #                 data = model.__dict__
-    #             else:
-    #                 # Fallback - try to convert to dict
-    #                 data = dict(model)
-    #
-    #             records.append(DataRecord.create_valid(data, i))
-    #
-    #         except Exception as e:
-    #             self.logger.error(
-    #                 "Failed to convert model to record",
-    #                 model_index=i,
-    #                 error_message=str(e)
-    #             )
-    #             records.append(DataRecord.create_invalid(
-    #                 {}, i, f"Model conversion error: {str(e)}"
-    #             ))
-    #
-    #     return records
+    def _print_sample_records(self, data_stream: Iterator[DataRecord],
+                              config: DataSourceDefinition) -> LoadingStats:
+        """Print first 10 records when target is disabled."""
+        start_time = datetime.now()
+        records = []
+
+        # Collect first 10 valid records
+        count = 0
+        total_count = 0
+
+        for record in data_stream:
+            total_count += 1
+            if record.is_valid() and count < 10:
+                records.append(record)
+                count += 1
+
+            if count >= 10:
+                break
+
+        # Print records
+        print(f"\n=== Sample Records from {config.type.value} Source ===")
+        for i, record in enumerate(records, 1):
+            print(f"Record {i}:")
+            for key, value in record.get_data().items():
+                print(f"  {key}: {value}")
+            print()
+
+        end_time = datetime.now()
+        duration_ms = int((end_time - start_time).total_seconds() * 1000)
+
+        return LoadingStats(
+            total_records=total_count,
+            successful_records=count,
+            error_records=0,
+            write_time_ms=duration_ms,
+            execution_time=end_time
+        )

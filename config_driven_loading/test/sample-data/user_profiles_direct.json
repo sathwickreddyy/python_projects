@@ -1,0 +1,24 @@
+{
+  "users": [
+    {
+      "userId": "user001",
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john.doe@example.com",
+      "phone": "+1-555-0123",
+      "dateOfBirth": "1990-05-15",
+      "notifications": true,
+      "newsletter": false
+    },
+    {
+      "userId": "user002",
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "email": "jane.smith@example.com",
+      "phone": "+1-555-0456",
+      "dateOfBirth": "1985-08-22",
+      "notifications": false,
+      "newsletter": true
+    }
+  ]
+}

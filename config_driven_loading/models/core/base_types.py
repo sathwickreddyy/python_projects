@@ -10,60 +10,47 @@ from pydantic import BaseModel
 
 
 class DataSourceType(str, Enum):
-    """
-    Enumeration of supported data source types.
-    """
-    CSV = "csv"
-    JSON = "json"
-    API = "api"
-    PROTO = "proto"
+    """Enumeration of supported data source types."""
+    CSV = "CSV"
+    JSON = "JSON"
 
 class TargetType(str, Enum):
     """
     Enumeration of supported target loading types.
     """
     TABLE = "table"
-    MODEL = "model"
 
 class DataType(str, Enum):
-    """
-    Enumeration of supported data types for conversions.
-    """
-    STRING = "string"
-    INTEGER = "integer"
-    LONG = "long"
-    FLOAT = "float"
-    DECIMAL = "decimal"
-    BOOLEAN = "boolean"
-    DATE = "date"
-    DATETIME = "datetime"
-    TIMESTAMP = "timestamp"
+    """Enumeration of supported data types for conversion."""
+    STRING = "STRING"
+    INTEGER = "INTEGER"
+    LONG = "LONG"
+    FLOAT = "FLOAT"
+    DECIMAL = "DECIMAL"
+    BOOLEAN = "BOOLEAN"
+    DATE = "DATE"
+    DATETIME = "DATETIME"
+    TIMESTAMP = "TIMESTAMP"
 
 class MappingStrategy(str, Enum):
-    """
-    Enumeration of supported mapping strategies for model based loadings.
-    """
-    DIRECT = "direct"
-    MAPPED = "mapped"
+    """Enumeration of field mapping strategies."""
+    DIRECT = "DIRECT"
+    MAPPED = "MAPPED"
+
 
 class LoadingStats(BaseModel):
-    """
-    Statistics for data loading operations.
-    """
+    """Statistics for data loading operations."""
     read_time_ms: int = 0
     process_time_ms: int = 0
     write_time_ms: int = 0
     batch_count: int = 0
-    records_per_second: int = 0
+    records_per_second: float = 0.0
     total_records: int = 0
     successful_records: int = 0
     error_records: int = 0
-    execution_time_ms: int = 0
+    execution_time: datetime
 
     class Config:
-        """
-        Pydantic Config class used to customize how Pydantic models behave when converting to JSON.
-        """
         json_encoders = {
-            datetime: lambda dt: dt.isoformat(),
+            datetime: lambda v: v.isoformat()
         }

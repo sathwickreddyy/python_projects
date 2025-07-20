@@ -28,7 +28,7 @@ from data_loaders.base_loader import BaseDataLoader
 from models.data_record import DataRecord
 from config.data_loader_config import DataSourceDefinition, ColumnMapping
 from models.core.exceptions import DataLoadingException
-from models.core.base_types import DataSourceType
+from models.core.base_types import DataSourceType, MappingStrategy
 
 
 class JSONDataLoader(BaseDataLoader):
@@ -43,14 +43,9 @@ class JSONDataLoader(BaseDataLoader):
     - Configurable through DataSourceDefinition
     """
 
-    def get_type(self) -> str:
-        """
-        Identifies the type of loader.
-
-        Returns:
-            str: Identifier for this loader, 'JSON'
-        """
-        return DataSourceType.JSON.value
+    def get_type(self) -> DataSourceType:
+        """Return the JSON loader type identifier."""
+        return DataSourceType.JSON
 
     def load_data(self, config: DataSourceDefinition) -> Iterator[DataRecord]:
         """
@@ -67,7 +62,7 @@ class JSONDataLoader(BaseDataLoader):
         """
         self.validate_config(config)
 
-        source = config.source
+        source = config.source_config
         file_path = Path(source.file_path)
 
         if not file_path.exists():
@@ -93,11 +88,11 @@ class JSONDataLoader(BaseDataLoader):
             # Process each node into DataRecord
             for row_number, node in enumerate(data_nodes, 1):
                 try:
-                    if config.column_mapping:
-                        # If column mapping is provided, extract values per mapping
-                        data = self._process_column_mappings(node, config.column_mapping)
+                    if config.input_output_mapping.mapping_strategy == MappingStrategy.MAPPED:
+                        # Use column mappings for nested path extraction
+                        data = self._process_column_mappings(node, config.input_output_mapping.column_mappings)
                     else:
-                        # Otherwise, take entire node content as dictionary
+                        # Extract all fields directly (DIRECT mapping)
                         data = self._extract_all_fields(node)
 
                     yield self._create_data_record(data, row_number)
@@ -255,7 +250,10 @@ class JSONDataLoader(BaseDataLoader):
                     current = current[field_name]
                     if isinstance(current, list):
                         try:
-                            current = current[0] if index_str == '*' else current[int(index_str)]
+                            if index_str == '*':
+                                current = current[0] if current else None
+                            else:
+                                current = current[int(index_str)]
                         except (ValueError, IndexError):
                             return None
                     else:

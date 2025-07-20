@@ -5,6 +5,9 @@ Data processor for transforming and validating data records.
 @author sathwick
 """
 from typing import Iterator, List
+
+import re
+from models.core.base_types import MappingStrategy
 from models.data_record import DataRecord
 from config.data_loader_config import DataSourceDefinition, ColumnMapping
 from converters.data_type_converter import DataTypeConverter
@@ -14,13 +17,68 @@ from models.core.logging_config import DataIngestionLogger
 
 class DataProcessor:
     """
-    Data processor for applying transformations and validations to data records.
-
-    This processor handles:
-    - Column mapping and renaming
+    DataProcessor is responsible for processing a stream of DataRecord objects by applying:
+    - Column mapping (explicit via mappings or implicit via direct strategy)
     - Data type conversion
-    - Data validation
-    - Error handling and recovery
+    - Data validation (required fields, quality checks)
+    - Per-record error handling
+
+    This ensures input data is standardized, cleaned, and ready for downstream persistence.
+
+    -------------------------------------------------------------------------------
+    |                               DataProcessor                                 |
+    -------------------------------------------------------------------------------
+    | Input: Iterator[DataRecord]                                                 |
+    |                                                                             |
+    | ┌──────────────────────────────────────────────────────────────────────┐    |
+    | │                              For Each Record                         │    |
+    | └──────────────────────────────────────────────────────────────────────┘    |
+    |         │                                                                   │
+    |         ├─── Is record invalid? ──────> Yes ──> Yield as is (invalid)       │
+    |         │                                         with error reason         │
+    |         │                                                                   │
+    |         ▼                                                                   │
+    |    Mapping Strategy?                                                        │
+    |     ┌────────────────────┐                                                  │
+    |     │  MAPPED            │ ──> Apply mappings,                              │
+    |     │                    │     type conversion                              │
+    |     │  (source → target) │     default values                               │
+    |     └────────────────────┘                                                  │
+    |             │                                                               │
+    |             └─ Missing required field? → Mark invalid with reason           │
+    |                                                                             │
+    |     ┌────────────────────┐                                                  │
+    |     │  DIRECT            │ ──> Convert field names                          │
+    |     │ (camelCase → SNAKE)│     Keep values as-is                            │
+    |     └────────────────────┘                                                  │
+    |                                                                             │
+    | Validation:                                                                 │
+    | - Required columns present?                                                 │
+    | - Data quality checks?                                                      │
+    |                                                                             │
+    | ┌───────────────────────────────────────────────────────────────────────┐   |
+    | │     Yield Valid Record    │      OR      │     Yield Invalid Record   │   |
+    | │ (mapped + validated data) │              │ (with error message)       │   |
+    | └───────────────────────────────────────────────────────────────────────┘   |
+    -------------------------------------------------------------------------------
+
+    What is DataRecord?
+    -------------------
+    DataRecord is a standardized container for a single input row.
+
+    Attributes:
+    -----------
+    - `data`: Dict[str, Any]  → The actual fields and values after mapping
+    - `row_number`: int       → Source row number for traceability
+    - `valid`: bool           → Flag indicating validity (True/False)
+    - `error_message`: str    → Reason for invalidity, if any
+
+    Benefits of DataRecord:
+    -----------------------
+    - Consistent structure for valid and invalid data
+    - Tracks processing failures per record without halting pipeline
+    - Enables auditability and debugging via row numbers and error details
+    - Compatible with streaming large datasets
     """
 
     def __init__(self, data_type_converter: DataTypeConverter):
@@ -47,8 +105,8 @@ class DataProcessor:
         """
         self.logger.info(
             "Starting data processing",
-            data_source=config.identifier,
-            column_mappings=len(config.column_mapping)
+            data_source=config.type.value,
+            mapping_strategy=config.input_output_mapping.mapping_strategy.value
         )
 
         processed_count = 0
@@ -62,8 +120,11 @@ class DataProcessor:
 
             try:
                 # Apply column mapping and type conversion
-                processed_record = self._apply_column_mapping(record, config.column_mapping)
-
+                # Apply column mapping and type conversion based on strategy
+                if config.input_output_mapping.mapping_strategy == MappingStrategy.MAPPED:
+                    processed_record = self._apply_mapped_strategy(record, config.input_output_mapping.column_mappings)
+                else:
+                    processed_record = self._apply_direct_strategy(record)
                 # Apply validation
                 if config.validation:
                     processed_record = self._validate_record(processed_record, config.validation)
@@ -93,10 +154,11 @@ class DataProcessor:
             error_records=error_count
         )
 
-    def _apply_column_mapping(self, record: DataRecord,
-                              mappings: List[ColumnMapping]) -> DataRecord:
-        """Apply column mapping and type conversion."""
+    def _apply_mapped_strategy(self, record: DataRecord,
+                               mappings: List[ColumnMapping]) -> DataRecord:
+        """Apply mapped strategy with explicit column mappings."""
         if not mappings:
+            self.logger.warning("MAPPED strategy selected but no column mappings provided")
             return record
 
         original_data = record.get_data()
@@ -139,6 +201,24 @@ class DataProcessor:
                 )
 
         return DataRecord.create_valid(mapped_data, record.row_number)
+
+    def _apply_direct_strategy(self, record: DataRecord) -> DataRecord:
+        """Apply direct strategy - convert camelCase to snake_case and uppercase."""
+        original_data = record.get_data()
+        direct_data = {}
+
+        for key, value in original_data.items():
+            # Convert camelCase to snake_case and uppercase
+            snake_case_key = self._camel_to_snake(key).upper()
+            direct_data[snake_case_key] = value
+
+        return DataRecord.create_valid(direct_data, record.row_number)
+
+    def _camel_to_snake(self, camel_str: str) -> str:
+        """Convert camelCase to snake_case."""
+        # Insert underscore before uppercase letters
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', camel_str)
+        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
 
     def _validate_record(self, record: DataRecord, validation_config) -> DataRecord:
         """Apply validation rules to the record."""

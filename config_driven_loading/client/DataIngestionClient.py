@@ -121,53 +121,6 @@ class DataIngestionClient:
             self.logger.error(f"Failed to execute all data sources: {str(e)}")
             raise DataIngestionException(f"All sources execution failed: {str(e)}", e)
 
-    # def load_models(
-    #         self,
-    #         models: List[Union[Dict[str, Any], Any]],
-    #         table_name: str,
-    #         schema_name: str = "public"
-    # ) -> LoadingStats:
-    #     """
-    #     Load model objects directly to database.
-    #
-    #     Args:
-    #         models: List of model objects (dicts or Pydantic models)
-    #         table_name: Target table name
-    #         schema_name: Target schema name
-    #
-    #     Returns:
-    #         LoadingStats with execution metrics
-    #     """
-    #     try:
-    #         self.logger.info(f"Loading {len(models)} models to {schema_name}.{table_name}")
-    #
-    #         # Convert Pydantic models to dicts if necessary
-    #         processed_models = []
-    #         for model in models:
-    #             if hasattr(model, 'dict'):
-    #                 processed_models.append(model.dict())
-    #             elif hasattr(model, '__dict__'):
-    #                 processed_models.append(model.__dict__)
-    #             else:
-    #                 processed_models.append(model)
-    #
-    #         stats = self.orchestrator.load_models_to_database(
-    #             processed_models, table_name, schema_name
-    #         )
-    #
-    #         self.logger.info(
-    #             f"Models loaded successfully",
-    #             table_name=table_name,
-    #             total_records=stats.total_records,
-    #             successful_records=stats.successful_records
-    #         )
-    #
-    #         return stats
-    #
-    #     except Exception as e:
-    #         self.logger.error(f"Failed to load models: {str(e)}")
-    #         raise DataIngestionException(f"Model loading failed: {str(e)}", e)
-
     def get_available_sources(self) -> List[str]:
         """
         Get list of available data sources.

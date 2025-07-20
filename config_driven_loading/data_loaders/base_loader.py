@@ -5,6 +5,8 @@ Base data loader interface and common functionality.
 """
 from abc import ABC, abstractmethod
 from typing import Iterator, Dict, Any
+
+from models.core.base_types import DataSourceType
 from models.data_record import DataRecord
 from config.data_loader_config import DataSourceDefinition
 from models.core.logging_config import DataIngestionLogger
@@ -21,7 +23,7 @@ class BaseDataLoader(ABC):
         self.logger = DataIngestionLogger(self.__class__.__name__)
 
     @abstractmethod
-    def get_type(self) -> str:
+    def get_type(self) -> DataSourceType:
         """Return the type identifier for this loader."""
         pass
 
@@ -52,8 +54,8 @@ class BaseDataLoader(ABC):
         Raises:
             ConfigurationException: If configuration is invalid
         """
-        if config.type.value != self.get_type():
-            raise ValueError(f"Invalid configuration type. Expected {self.get_type()}, got {config.type.value}")
+        if config.type != self.get_type():
+            raise ValueError(f"Invalid configuration type. Expected {self.get_type().value}, got {config.type.value}")
 
     def _create_data_record(self, data: Dict[str, Any], row_number: int) -> DataRecord:
         """Create a valid data record."""

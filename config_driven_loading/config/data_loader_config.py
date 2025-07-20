@@ -1,12 +1,12 @@
 """
 Skeleton for configuration files i.e, YAML Config.
 
-@version 1.0.0 supports CSV loading, JSON loading
+@version 1.0.0 supports CSV loading, JSON loading to database
 @author sathwick
 """
 
 from typing import Dict, List, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from models.core.base_types import DataSourceType, TargetType, DataType, MappingStrategy
 
 class SourceConfig(BaseModel):
@@ -38,8 +38,9 @@ class TargetConfig(BaseModel):
     # database related configuration
     schema_name: str = Field(None, description="Database Schema name")
     table: str = Field(None, description="Table name")
-    type: TargetType = Field(None, description="Target Type")
+    type: TargetType = Field(TargetType.TABLE, description="Target Type")
     batch_size: Optional[int] = Field(1000, description="Batch size for database operations")
+    enabled: bool = Field(..., description="Whether this target is enabled for processing") # false should ensure first 10 records to be printed
 
     @classmethod
     @field_validator("batch_size")
@@ -47,6 +48,13 @@ class TargetConfig(BaseModel):
         if v is not None and (v < 1 or v > 10000):
             raise ValueError('Batch size must be between 1 and 10000')
         return v
+
+    @model_validator(mode="after")
+    def validate_table_fields(self):
+        if self.type == TargetType.TABLE:
+            if not self.schema_name or not self.table:
+                raise ValueError("When type is 'table', 'schema_name' and 'table' must be provided.")
+        return self
 
 
 class ColumnMapping(BaseModel):
@@ -77,16 +85,34 @@ class ValidationConfig(BaseModel):
     required_columns: Optional[List[str]] = Field(None, description="List of required columns")
     data_quality_checks: bool = Field(False, description="Enable data quality checks")
 
+class InputOutputMapping(BaseModel):
+    mapping_strategy: MappingStrategy = Field(..., description="Mapping strategy")
+    column_mappings: Optional[List[ColumnMapping]] = Field(None, description="Column mappings from input field to output field")
+
+    @model_validator(mode="after")
+    def validate_mapping_strategy(self):
+        if self.mapping_strategy == MappingStrategy.MAPPED:
+            if not self.column_mappings or len(self.column_mappings) == 0:
+                raise ValueError(
+                    "Column mappings must be explicitly provided when 'MAPPED' strategy is selected."
+                )
+        elif self.mapping_strategy == MappingStrategy.DIRECT:
+            if self.column_mappings:
+                raise ValueError(
+                    "Column mappings should not be provided when 'DIRECT' strategy is selected. "
+                    "In 'DIRECT' mode, it is expected that camelCase input fields will automatically map "
+                    "to equivalent snake_case target fields (typically in uppercase)."
+                )
+        return self
+
 class DataSourceDefinition(BaseModel):
     """
     Complete definition of a data source.
     """
-    identifier: str = Field(..., description="Unique identifier for the data source")
     type: DataSourceType = Field(..., description="Type of data source")
-    source: SourceConfig = Field(..., description="Source configuration")
-    target: TargetConfig = Field(..., description="Target configuration")
-    column_mapping: List[ColumnMapping] = Field(..., description="Column mapping definitions")
-    model: Optional[ModelConfig] = Field(None, description="Model configuration")
+    source_config: SourceConfig = Field(..., description="Source configuration")
+    target_config: TargetConfig = Field(..., description="Target configuration")
+    input_output_mapping: InputOutputMapping = Field(..., description="Input and Output mapping definitions")
     validation: Optional[ValidationConfig] = Field(None, description="Validation configuration")
 
     @classmethod

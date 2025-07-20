@@ -1,55 +1,156 @@
-data-sources:
-  market_data_csv:
-    type: "CSV"
-    source:
-      filePath: "src/main/resources/sample-data/market_data.csv"
-      delimiter: ","
-      header: true
-      encoding: "UTF-8"
-    target:
-      table: "public.market_trends"
-    columnMapping:
-      - source: "date"
-        target: "trade_date"
-        data-type: "LOCALDATE"
-      - source: "currency_pair"
-        target: "currency"
-      - source: "rate"
-        target: "exchange_rate"
-        data-type: "DOUBLE"
-      - source: "volume"
-        target: "trading_volume"
-        data-type: "BIGDECIMAL"
-  market_data_csv_bitemporal:
-    type: "CSV"
-    source:
-      filePath: "src/main/resources/sample-data/market_data.csv"
-      delimiter: ","
-      header: true
-      encoding: "UTF-8"
-#      target:
-#        table: "public.market_trends_bi_temporal"
-#        isBiTemporal: true
-    columnMapping:
-      - source: "date"
-        target: "trade_date"
-        data-type: "LOCALDATE"
-        target-date-format: "dd-MM-yyyy"
-      - source: "currency_pair"
-        target: "currency"
-      - source: "rate"
-        target: "exchange_rate"
-        data-type: "DOUBLE"
-      - source: "volume"
-        target: "trading_volume"
-        data-type: "BIGDECIMAL"
+# data-sources.yaml
+data_sources:
+  user_profile_json:
+    type: "JSON"
+    source_config:
+      file_path: "sample-data/user_profiles.json"
+      json_path: "$.users[*]"
+      encoding: "utf-8"
+    target_config:
+      schema_name: "public"
+      table: "user_profiles"
+      type: "table"
+      batch_size: 1000
+      enabled: true  # Set to false to only print records without DB write
+    input_output_mapping:
+      mapping_strategy: "MAPPED"
+      column_mappings:
+        - source: "id"
+          target: "user_id"
+          data_type: "STRING"
+          required: true
+        - source: "profile.personal.firstName"
+          target: "first_name"
+          data_type: "STRING"
+          required: true
+        - source: "profile.personal.lastName"
+          target: "last_name"
+          data_type: "STRING"
+          required: true
+        - source: "profile.contact.email"
+          target: "email"
+          data_type: "STRING"
+          required: true
+        - source: "profile.contact.addresses[0].city"
+          target: "city"
+          data_type: "STRING"
+        - source: "profile.contact.addresses[0].country"
+          target: "country"
+          data_type: "STRING"
+          default_value: "USA"
+        - source: "profile.personal.dateOfBirth"
+          target: "date_of_birth"
+          data_type: "DATE"
+          source_date_format: "%Y-%m-%d"
+        - source: "profile.contact.phone"
+          target: "phone"
+          data_type: "STRING"
+        - source: "preferences.notifications"
+          target: "notifications_enabled"
+          data_type: "BOOLEAN"
+        - source: "preferences.newsletter"
+          target: "newsletter_subscribed"
+          data_type: "BOOLEAN"
+    validation:
+      required_columns: ["id", "profile.personal.firstName"]
+      data_quality_checks: true
 
-# All data type conversions are supported - check DataTypeConverter class that is being used by orchestrator
-# test mode - we can remove target option
-# test mode - we can exclude the dataTypeValidationRequired option
-# test mode - Any column commenting is easy and won't be any problem - loads with null for that column in the table easy in terms of testing
-# test mode -All types of delimiters are supported
-# test mode - we can specify target date formats as well - cmd+click on columnMapping to check all options
-# Supports both standard loading and bitemporal loading
-# Any source column changes are easy to make and will not break the code and dont need worry on fixing bugs
-# New file loading is easy
+  # Test DIRECT mapping strategy
+  user_profile_json_direct:
+    type: "JSON"
+    source_config:
+      file_path: "sample-data/user_profiles_direct.json"
+      json_path: "$.users[*]"
+      encoding: "utf-8"
+    target_config:
+      schema_name: "public"
+      table: "user_profiles_direct"
+      type: "table"
+      batch_size: 1000
+      enabled: true
+    input_output_mapping:
+      mapping_strategy: "DIRECT"  # No column_mappings needed
+    validation:
+      data_quality_checks: false
+
+  order_details_json:
+    type: "JSON"
+    source_config:
+      file_path: "sample-data/orders.json"
+      json_path: "$.orders[*]"
+      encoding: "utf-8"
+    target_config:
+      schema_name: "public"
+      table: "order_details"
+      type: "table"
+      batch_size: 500
+      enabled: true  # Set to false for testing without DB write
+    input_output_mapping:
+      mapping_strategy: "MAPPED"
+      column_mappings:
+        - source: "orderId"
+          target: "order_id"
+          data_type: "STRING"
+          required: true
+        - source: "customer.profile.name"
+          target: "customer_name"
+          data_type: "STRING"
+          required: true
+        - source: "customer.contact.email"
+          target: "customer_email"
+          data_type: "STRING"
+        - source: "orderDetails.items[0].product.name"
+          target: "primary_product"
+          data_type: "STRING"
+        - source: "orderDetails.items[0].quantity"
+          target: "primary_quantity"
+          data_type: "INTEGER"
+        - source: "orderDetails.pricing.total"
+          target: "total_amount"
+          data_type: "DECIMAL"
+        - source: "orderDetails.shipping.address.city"
+          target: "shipping_city"
+          data_type: "STRING"
+        - source: "orderDetails.shipping.address.zipCode"
+          target: "shipping_zip"
+          data_type: "STRING"
+        - source: "timestamps.created"
+          target: "created_date"
+          data_type: "DATETIME"
+          source_date_format: "%Y-%m-%dT%H:%M:%SZ"
+        - source: "status"
+          target: "order_status"
+          data_type: "STRING"
+    validation:
+      required_columns: ["orderId", "customer.profile.name"]
+      data_quality_checks: true
+
+  # Test mode - disabled target for debugging
+  order_details_json_test:
+    type: "JSON"
+    source_config:
+      file_path: "sample-data/orders.json"
+      json_path: "$.orders[*]"
+      encoding: "utf-8"
+    target_config:
+      schema_name: "public"
+      table: "order_details"
+      type: "table"
+      batch_size: 500
+      enabled: false  # This will print first 10 records only
+    input_output_mapping:
+      mapping_strategy: "MAPPED"
+      column_mappings:
+        - source: "orderId"
+          target: "order_id"
+          data_type: "STRING"
+          required: true
+        - source: "customer.profile.name"
+          target: "customer_name"
+          data_type: "STRING"
+          required: true
+        - source: "orderDetails.pricing.total"
+          target: "total_amount"
+          data_type: "DECIMAL"
+    validation:
+      data_quality_checks: false

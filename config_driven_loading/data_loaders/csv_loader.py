@@ -55,6 +55,13 @@ class CSVDataLoader(BaseDataLoader):
     DataLoadingException:
         If file does not exist, is not a file, or any fatal error occurs while reading.
 
+    Features:
+        - Configurable delimiter and encoding
+        - Supports CSV files with or without headers
+        - Skips initial rows if configured
+        - Comprehensive error handling and logging
+        - Memory-efficient row-wise processing using generator (yield)
+
     Example:
     --------
     csv_loader = CSVDataLoader()
@@ -64,48 +71,42 @@ class CSVDataLoader(BaseDataLoader):
         print(record)
     """
 
-    def get_type(self) -> str:
+    def get_type(self) -> DataSourceType:
         """
-        Return the CSV loader type identifier.
-
-        Returns:
-            str: The string 'csv' as defined in DataSourceType
+        Returns the loader type identifier.
         """
-        return DataSourceType.CSV.value
+        return DataSourceType.CSV
 
     def load_data(self, config: DataSourceDefinition) -> Iterator[DataRecord]:
         """
         Load data from a CSV file based on the provided configuration.
 
-        This method uses a generator to yield one DataRecord at a time, making it efficient for large files.
-
         Args:
-            config (DataSourceDefinition): Configuration specifying file path, delimiter,
-                                           encoding, header presence, and skip row options.
+            config (DataSourceDefinition): The data source configuration.
 
         Yields:
-            Iterator[DataRecord]: Yields DataRecord objects representing each CSV row.
+            Iterator[DataRecord]: DataRecord objects representing each CSV row.
 
         Raises:
-            DataLoadingException: If file not found, invalid file, or any other loading issue.
+            DataLoadingException: If file validation or loading fails.
         """
         self.validate_config(config)
 
-        source = config.source
+        source = config.source_config
         file_path = Path(source.file_path)
 
         if not file_path.exists():
             raise DataLoadingException(f"CSV file not found: {file_path}")
 
         if not file_path.is_file():
-            raise DataLoadingException(f"Path is not a file: {file_path}")
+            raise DataLoadingException(f"Path is not a valid file: {file_path}")
 
         self.logger.info(
-            "Loading CSV file",
+            "Starting CSV file load",
             file_path=str(file_path),
             delimiter=source.delimiter,
             encoding=source.encoding,
-            has_header=source.header
+            header_row=source.header
         )
 
         try:
@@ -116,18 +117,16 @@ class CSVDataLoader(BaseDataLoader):
                     skipinitialspace=True
                 ) if source.header else csv.reader(csvfile, delimiter=source.delimiter)
 
-                if source.skip_rows and source.skip_rows > 0:
-                    for _ in range(source.skip_rows):
-                        next(reader, None)
-
                 row_number = 1
                 processed_rows = 0
 
                 for row in reader:
                     try:
                         if isinstance(row, dict):
+                            # Header-based row
                             data = {key: value for key, value in row.items() if key is not None}
                         else:
+                            # Positional row (no headers)
                             data = {f"column_{i}": value for i, value in enumerate(row)}
 
                         yield self._create_data_record(data, row_number)
@@ -138,7 +137,7 @@ class CSVDataLoader(BaseDataLoader):
 
                     except Exception as e:
                         self.logger.error(
-                            "Failed to process CSV row",
+                            "Error processing CSV row",
                             row_number=row_number,
                             error_message=str(e)
                         )
@@ -156,8 +155,8 @@ class CSVDataLoader(BaseDataLoader):
 
         except Exception as e:
             self.logger.error(
-                "CSV loading failed",
+                "Failed to load CSV file",
                 file_path=str(file_path),
                 error_message=str(e)
             )
-            raise DataLoadingException(f"Failed to load CSV file: {str(e)}", e)
+            raise DataLoadingException(f"Failed to load CSV file: {str(e)}") from e
