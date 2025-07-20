@@ -66,7 +66,7 @@ class IngestionRunner:
 
     def get_available_sources(self) -> Dict[str, Any]:
         try:
-            sources = self.client.get_available_sources()
+            sources = self.client.get_available_sources_configs_in_yaml()
             return {
                 "success": True,
                 "sources": sources

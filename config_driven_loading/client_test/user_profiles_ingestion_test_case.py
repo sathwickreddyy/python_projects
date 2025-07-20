@@ -1,3 +1,5 @@
+import json
+
 from client_test.db_utils import DatabaseManager
 from client_test.ingestion_utils import IngestionRunner
 
@@ -44,9 +46,6 @@ def user_profiles_ingestion() -> dict:
                 "status": load_result.get("status"),
             }
 
-            # Validate inserted data
-            _validate_user_profiles_data(engine)
-
             return {
                 "success": load_result.get("success"),
                 "partial_success": load_result.get("partial_success"),
@@ -63,45 +62,7 @@ def user_profiles_ingestion() -> dict:
         engine.dispose()
 
 
-def _validate_user_profiles_data(engine) -> dict:
-    """Validate that data was inserted correctly and return details."""
-    from sqlalchemy import text
-
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT COUNT(*) FROM user_profiles"))
-            count = result.fetchone()[0]
-
-            sample_query = text(
-                "SELECT user_id, first_name, last_name, email FROM user_profiles LIMIT 3"
-            )
-            sample_result = conn.execute(sample_query)
-            rows = [
-                {
-                    "user_id": row.user_id,
-                    "first_name": row.first_name,
-                    "last_name": row.last_name,
-                    "email": row.email,
-                }
-                for row in sample_result.fetchall()
-            ]
-
-            return {
-                "record_count": count,
-                "sample_records": rows,
-                "validation_success": True
-            }
-
-    except Exception as e:
-        return {
-            "validation_success": False,
-            "error": str(e)
-        }
-
-
 if __name__ == "__main__":
     result = user_profiles_ingestion()
-    # Example: return result as JSON in an API, or log it for debugging.
-    import json
     print(json.dumps(result, indent=2))
     exit(0 if result.get("success") else 1)

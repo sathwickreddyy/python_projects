@@ -155,7 +155,7 @@ class DataIngestionClient:
             self.logger.error(f"Failed to execute all data sources: {str(e)}")
             raise DataIngestionException(f"All sources execution failed: {str(e)}", e)
 
-    def get_available_sources(self) -> List[str]:
+    def get_available_sources_configs_in_yaml(self) -> List[str]:
         """
         Get list of available data sources.
 

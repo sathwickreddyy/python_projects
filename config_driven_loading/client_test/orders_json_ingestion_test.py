@@ -46,9 +46,6 @@ def order_details_ingestion() -> dict:
                 "status": loading_result.get("status"),
             }
 
-            # Validate inserted data
-            _validate_order_data(engine)
-
             return {
                 "success": loading_result.get("success"),
                 "partial_success": loading_result.get("partial_success"),
@@ -63,62 +60,6 @@ def order_details_ingestion() -> dict:
         }
     finally:
         engine.dispose()
-
-
-def _validate_order_data(engine) -> dict:
-    """Validate order data in database."""
-    from sqlalchemy import text
-
-    try:
-        with engine.connect() as conn:
-            # Count orders
-            result = conn.execute(text("SELECT COUNT(*) FROM order_details"))
-            count = result.fetchone()[0]
-
-            # Sample records
-            sample_query = text("""
-                SELECT order_id, customer_name, total_amount, order_status, created_date
-                FROM order_details 
-                ORDER BY created_date 
-                LIMIT 3
-            """)
-            sample_result = conn.execute(sample_query)
-            rows = [
-                {
-                    "order_id": row.order_id,
-                    "customer_name": row.customer_name,
-                    "total_amount": row.total_amount,
-                    "order_status": row.order_status,
-                    "created_date": row.created_date.isoformat() if row.created_date else None,
-                }
-                for row in sample_result.fetchall()
-            ]
-
-            # Check for null values in important fields
-            nulls_query = text("""
-                SELECT 
-                    SUM(CASE WHEN order_id IS NULL THEN 1 ELSE 0 END) as null_order_ids,
-                    SUM(CASE WHEN customer_name IS NULL THEN 1 ELSE 0 END) as null_names
-                FROM order_details
-            """)
-            null_counts = conn.execute(nulls_query).fetchone()
-
-            return {
-                "record_count": count,
-                "sample_records": rows,
-                "null_checks": {
-                    "null_order_ids": null_counts.null_order_ids,
-                    "null_customer_names": null_counts.null_names
-                },
-                "validation_success": (null_counts.null_order_ids == 0 and null_counts.null_names == 0)
-            }
-
-    except Exception as e:
-        return {
-            "validation_success": False,
-            "error": str(e)
-        }
-
 
 
 def json_default_encoder(obj):
