@@ -5,6 +5,7 @@ Simplified client interface for data ingestion operations.
 """
 from typing import Dict, Any, List, Optional
 
+from sqlalchemy import Engine, create_engine
 from client.orchestrator_factory import DataIngestionFactory
 from models.core.base_types import LoadingStats
 from models.core.exceptions import DataIngestionException
@@ -17,53 +18,86 @@ class DataIngestionClient:
 
     This class provides a high-level, easy-to-use interface for client applications
     to perform data ingestion operations without dealing with internal complexity.
+
+    Updated to support both external engines and database URLs for flexibility.
     """
 
-    def __init__(
-            self,
-            database_url: str,
-            config_path: Optional[str] = None,
-            config_dict: Optional[Dict[str, Any]] = None,
-            pool_size: int = 10,
-            max_overflow: int = 20,
-            echo: bool = False,
-            log_level: str = "INFO",
-            json_logs: bool = False
-    ):
+    def __init__(self,
+                 engine: Optional[Engine] = None,
+                 database_url: Optional[str] = None,
+                 config_path: Optional[str] = None,
+                 config_dict: Optional[Dict[str, Any]] = None,
+                 pool_size: int = 10,
+                 max_overflow: int = 20,
+                 echo: bool = False,
+                 log_level: str = "INFO",
+                 json_logs: bool = False):
         """
         Initialize the data ingestion client.
 
         Args:
-            database_url: Database connection URL
+            engine: Pre-configured SQLAlchemy engine (takes precedence over database_url)
+            database_url: Database connection URL (used only if engine is not provided)
             config_path: Path to YAML configuration file
             config_dict: Configuration dictionary
-            pool_size: Database connection pool size
-            max_overflow: Maximum pool overflow
-            echo: Whether to echo SQL statements
+            pool_size: Database connection pool size (only used with database_url)
+            max_overflow: Maximum pool overflow (only used with database_url)
+            echo: Whether to echo SQL statements (only used with database_url)
             log_level: Logging level
             json_logs: Whether to use JSON logging format
+
+        Raises:
+            ValueError: If neither engine nor database_url is provided
         """
         # Setup logging
         setup_logging(log_level, json_logs)
         self.logger = DataIngestionLogger(__name__)
 
+        # Handle engine creation or validation
+        if engine is not None:
+            self.engine = engine
+            self._engine_owned = False  # We don't own this engine
+            self.logger.info("Using provided SQLAlchemy engine")
+        elif database_url is not None:
+            self.engine = self._create_engine(database_url, pool_size, max_overflow, echo)
+            self._engine_owned = True  # We created this engine
+            self.logger.info("Created SQLAlchemy engine from database URL")
+        else:
+            raise ValueError("Either 'engine' or 'database_url' must be provided")
+
         # Initialize factory
         self.factory = DataIngestionFactory()
 
-        # Create orchestrator
-        self.orchestrator = self.factory.create_orchestrator(
-            database_url=database_url,
-            pool_size=pool_size,
-            max_overflow=max_overflow,
-            echo=echo,
-        )
+        # Create orchestrator with the engine
+        self.orchestrator = self.factory.create_orchestrator(engine=self.engine)
 
         # Load configuration
         self.config = self.factory.load_configuration(config_path, config_dict)
 
         self.logger.info("Data ingestion client initialized successfully")
 
-    def execute_data_source_loading_to_db(self, source_name: str) -> LoadingStats:
+    def _create_engine(self, database_url: str, pool_size: int, max_overflow: int, echo: bool) -> Engine:
+        """
+        Create SQLAlchemy engine with specified parameters.
+
+        Args:
+            database_url: Database connection URL
+            pool_size: Connection pool size
+            max_overflow: Maximum pool overflow
+            echo: Whether to echo SQL statements
+
+        Returns:
+            Configured SQLAlchemy engine
+        """
+        return create_engine(
+            database_url,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_pre_ping=True,
+            echo=echo
+        )
+
+    def execute_data_source(self, source_name: str) -> LoadingStats:
         """
         Execute data loading for a specific data source.
 
@@ -94,7 +128,7 @@ class DataIngestionClient:
             self.logger.error(f"Failed to execute data source {source_name}: {str(e)}")
             raise DataIngestionException(f"Data source execution failed: {str(e)}", e)
 
-    def execute_all_sources_to_db(self) -> Dict[str, LoadingStats]:
+    def execute_all_sources(self) -> Dict[str, LoadingStats]:
         """
         Execute data loading for all configured data sources.
 
@@ -183,9 +217,33 @@ class DataIngestionClient:
 
         return results
 
+    def get_engine_info(self) -> Dict[str, Any]:
+        """
+        Get information about the current database engine.
+
+        Returns:
+            Dictionary with engine information
+        """
+        try:
+            return {
+                "url": str(self.engine.url).split('@')[0] + '@***',  # Hide credentials
+                "driver": self.engine.dialect.name,
+                "pool_size": getattr(self.engine.pool, 'size', None),
+                "pool_checked_out": getattr(self.engine.pool, 'checkedout', None),
+                "engine_owned": self._engine_owned
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
     def close(self):
         """Close all connections and clean up resources."""
         self.factory.close_all()
+
+        # Only dispose the engine if we created it
+        if self._engine_owned and hasattr(self, 'engine'):
+            self.engine.dispose()
+            self.logger.info("Database engine disposed")
+
         self.logger.info("Data ingestion client closed")
 
     def __enter__(self):
