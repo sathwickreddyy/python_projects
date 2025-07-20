@@ -88,45 +88,29 @@ class DataOrchestrator:
             write_stats = self.database_writer.write_data(iter(processed_records), data_source_config)
             write_end = datetime.now()
 
-
-            # Merge all statistics properly
-            final_stats = LoadingStats(
-                read_time_ms=read_time_ms,
-                process_time_ms=process_time_ms,
-                write_time_ms=write_stats.write_time_ms,
-                batch_count=write_stats.batch_count,
-                records_per_second=write_stats.records_per_second,
-                total_records=write_stats.total_records,
-                successful_records=write_stats.successful_records,
-                error_records=write_stats.error_records,
-                execution_time=write_end,
-                source_name=data_source_name,
-                target_table=data_source_config.target_config.table
-            )
+            processing_stats.write_time_ms = write_stats.write_time_ms
+            processing_stats.batch_count = write_stats.batch_count
+            processing_stats.records_per_second = write_stats.records_per_second
+            processing_stats.execution_time = write_end
 
             # Merge processing errors if available
             if processing_stats:
-                final_stats.validation_errors.extend(processing_stats.validation_errors)
-                final_stats.conversion_errors.extend(processing_stats.conversion_errors)
-                final_stats.processing_errors.extend(processing_stats.processing_errors)
-                final_stats.error_details.extend(processing_stats.error_details)
-
                 # Update derived fields
-                final_stats.has_errors = len(final_stats.get_all_errors()) > 0
-                final_stats.success_rate = (
-                            final_stats.successful_records / final_stats.total_records * 100) if final_stats.total_records > 0 else 0.0
+                processing_stats.has_errors = len(processing_stats.get_all_errors()) > 0
+                processing_stats.success_rate = (
+                            processing_stats.successful_records / processing_stats.total_records * 100) if processing_stats.total_records > 0 else 0.0
 
             self.logger.info(
                 "Data loading execution completed",
                 data_source=data_source_name,
-                total_records=final_stats.total_records,
-                successful_records=final_stats.successful_records,
-                error_records=final_stats.error_records,
-                total_errors=len(final_stats.get_all_errors()),
-                success_rate=final_stats.success_rate
+                total_records=processing_stats.total_records,
+                successful_records=processing_stats.successful_records,
+                error_records=processing_stats.error_records,
+                total_errors=len(processing_stats.get_all_errors()),
+                success_rate=processing_stats.success_rate
             )
 
-            return final_stats
+            return processing_stats
 
         except Exception as e:
             self.logger.error(

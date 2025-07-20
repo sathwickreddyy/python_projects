@@ -97,26 +97,26 @@ class IngestionRunner:
         return self.client.get_available_sources()
 
     def _print_execution_summary(self, stats) -> bool:
-        """Print formatted execution summary."""
+        """Print formatted execution summary and return success status."""
+
         if stats.total_records == 0:
             print("⚠️ No records were processed.")
             return False
 
+        # Complete failure (all records failed)
         if stats.error_records == stats.total_records:
-            print(f"❌ Ingestion Failed due to {stats.error_records} errors in feed records failed.")
-            errors = stats.get_all_errors()
-            if errors:
-                print("   Error details:")
-                for error in errors[:10]:  # Show first 10 errors
-                    print(f"     - {error}")
-                if len(errors) > 10:
-                    print(f"     ... and {len(errors) - 10} more")
+            print(f"❌ Ingestion Failed: All {stats.total_records} records failed to write to DB.")
+            self._print_error_details(stats)
             return False
-        elif stats.error_records == 0:
-            print(f"✅ Success: {stats.successful_records}/{stats.total_records} records")
-        else:
-            print(f"⚠️ Partial Success: {stats.successful_records}/{stats.total_records} records")
 
+        # Complete success
+        if stats.error_records == 0:
+            print(f"✅ Ingestion Successful: All records processed and written to DB.")
+        else:
+            print(f"⚠️ Ingestion Failed to write some records to DB, but processing was successful.")
+            print(f"   {stats.error_records} records failed to write to DB.")
+
+        # Common reporting
         print(f"   Duration: {stats.write_time_ms}ms")
         print(f"   Throughput: {stats.records_per_second:.2f} records/sec")
         print(f"   Average per record: {stats.write_time_ms / max(stats.total_records, 1):.1f}ms")
@@ -125,13 +125,25 @@ class IngestionRunner:
             print(f"   Batches: {stats.batch_count}")
 
         if stats.error_records > 0:
-            print(f"❌  Errors: {stats.error_records} records failed")
-            errors = stats.get_all_errors()
-            if errors:
-                print("   Error details:")
-                for error in errors:
-                    print(f"     - {error}")
-        return True
+            self._print_error_details(stats)
+
+        # Summary outcome
+        if stats.error_records == 0:
+            print(f"✅ Success: {stats.successful_records}/{stats.total_records} records written to DB")
+            return True
+        else:
+            print(f"⚠️ Partial Success: {stats.successful_records}/{stats.total_records} ❌  No records written to DB")
+            return False
+
+    def _print_error_details(self, stats):
+        """Helper to print detailed error messages from stats."""
+        errors = stats.get_all_errors()
+        if errors:
+            print("   Error details:")
+            for error in errors[:10]:
+                print(f"     - {error}")
+            if len(errors) > 10:
+                print(f"     ... and {len(errors) - 10} more")
 
     def _print_overall_summary(self, results: Dict[str, Dict[str, Any]]):
         """Print overall summary for multiple sources."""
